@@ -9,8 +9,14 @@ Rails.application.routes.draw do
       resources :users, only: [:create] do
         collection do
           get 'profile'
+          put 'complete_profile'
         end
       end
+
+      # Email confirmation routes
+      post 'confirmations/confirm', to: 'confirmations#confirm'
+      post 'confirmations/resend', to: 'confirmations#resend'
+      post 'confirmations/send', to: 'confirmations#send_confirmation'
     end
   end
 

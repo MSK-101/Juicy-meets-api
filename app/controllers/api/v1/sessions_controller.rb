@@ -6,21 +6,42 @@ class Api::V1::SessionsController < ApplicationController
     user = User.find_by(email: session_params[:email])
 
     if user && user.valid_password?(session_params[:password])
+      # Check if user's email is confirmed
+      unless user.confirmed?
+        render json: {
+          success: false,
+          message: 'Please confirm your email address before signing in',
+          confirmation_required: true,
+          user: {
+            id: user.id,
+            email: user.email,
+            confirmed: false
+          }
+        }, status: :unauthorized
+        return
+      end
+
       # Use warden directly to avoid session issues
       warden.set_user(user, store: false)
       token = request.env['warden-jwt_auth.token']
 
       render json: {
+        success: true,
         user: {
           id: user.id,
           email: user.email,
-          created_at: user.created_at
+          confirmed: user.confirmed?,
+          created_at: user.created_at,
+          profile_completed: user.profile_completed
         },
         token: token,
         message: 'Successfully signed in'
       }
     else
-      render json: { errors: ['Invalid email or password'] }, status: :unauthorized
+      render json: {
+        success: false,
+        errors: ['Invalid email or password']
+      }, status: :unauthorized
     end
   end
 

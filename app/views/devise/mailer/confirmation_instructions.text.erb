@@ -1,0 +1,13 @@
+Welcome <%= @resource.email %>!
+
+You can confirm your account email through the link below:
+
+<%= @confirmation_url %>
+
+If you are using a mobile app or API client, you can confirm your account by making a POST request to:
+URL: <%= Rails.application.config.action_mailer.default_url_options[:host] %>/api/v1/confirmations/confirm
+Token: <%= @token %>
+
+Your confirmation token is: <%= @token %>
+
+Thank you for joining Juicy Meets!
