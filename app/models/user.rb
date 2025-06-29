@@ -1,9 +1,9 @@
 class User < ApplicationRecord
   # Include default devise modules. Others available are:
-  # :lockable, :timeoutable, :trackable and :omniauthable
+  # :lockable, :timeoutable, :trackable
   devise :database_authenticatable, :registerable,
          :recoverable, :rememberable, :validatable,
-         :confirmable,
+         :confirmable, :omniauthable,
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
 
   # Enums for profile fields
@@ -29,6 +29,23 @@ class User < ApplicationRecord
   scope :profile_completed, -> { where(profile_completed: true) }
   scope :profile_incomplete, -> { where(profile_completed: false) }
 
+  # OAuth methods
+  def self.from_omniauth(auth)
+    where(email: auth.info.email).first_or_create do |user|
+      user.email = auth.info.email
+      user.password = Devise.friendly_token[0, 20]
+      user.provider = auth.provider
+      user.uid = auth.uid
+      # OAuth users are automatically confirmed
+      user.confirmed_at = Time.current
+      user.skip_confirmation!
+    end
+  end
+
+  def oauth_user?
+    provider.present? && uid.present?
+  end
+
   # Methods
   def profile_complete?
     age.present? && gender.present? && interested_in.present?
@@ -51,13 +68,13 @@ class User < ApplicationRecord
     !confirmed?
   end
 
-  # Override active_for_authentication to require confirmation
+  # Override active_for_authentication to require confirmation (except for OAuth users)
   def active_for_authentication?
-    super && confirmed?
+    super && (confirmed? || oauth_user?)
   end
 
   # Custom message when user is not confirmed
   def inactive_message
-    confirmed? ? super : :unconfirmed
+    (confirmed? || oauth_user?) ? super : :unconfirmed
   end
 end

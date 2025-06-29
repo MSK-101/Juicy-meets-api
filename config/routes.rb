@@ -1,6 +1,10 @@
 Rails.application.routes.draw do
   devise_for :users, skip: :all
 
+  # OAuth routes (standard omniauth paths)
+  get '/auth/:provider/callback', to: 'api/v1/omniauth_callbacks#google_oauth2'
+  get '/auth/failure', to: 'api/v1/omniauth_callbacks#failure'
+
   namespace :api do
     namespace :v1 do
       post 'login', to: 'sessions#create'
@@ -17,6 +21,13 @@ Rails.application.routes.draw do
       post 'confirmations/confirm', to: 'confirmations#confirm'
       post 'confirmations/resend', to: 'confirmations#resend'
       post 'confirmations/send', to: 'confirmations#send_confirmation'
+
+      # OAuth routes
+      get 'auth/google', to: redirect('/auth/google_oauth2')
+      get 'auth/google_oauth2/callback', to: 'omniauth_callbacks#google_oauth2'
+      get 'auth/oauth_urls', to: 'auth#oauth_urls'
+      get 'auth/providers', to: 'auth#providers'
+      post 'auth/simulate_oauth', to: 'auth#simulate_oauth'
     end
   end
 

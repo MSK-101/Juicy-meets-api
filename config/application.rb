@@ -40,5 +40,10 @@ module JuicyMeetsApi
     # Middleware like session, flash, cookies can be added back manually.
     # Skip views, helpers and assets when generating a new resource.
     config.api_only = true
+
+    # Add session store for OAuth (required by omniauth)
+    config.session_store :cookie_store, key: '_juicy_meets_session'
+    config.middleware.use ActionDispatch::Cookies
+    config.middleware.use config.session_store, config.session_options
   end
 end

@@ -62,8 +62,10 @@ class Api::V1::UsersController < ApplicationController
     {
       id: user.id,
       email: user.email,
+      provider: user.provider,
       confirmed: user.confirmed?,
       confirmed_at: user.confirmed_at,
+      oauth_user: user.oauth_user?,
       age: user.age,
       gender: user.gender,
       interested_in: user.interested_in,
