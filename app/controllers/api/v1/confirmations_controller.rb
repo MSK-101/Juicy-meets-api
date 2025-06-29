@@ -1,7 +1,7 @@
 class Api::V1::ConfirmationsController < ApplicationController
   before_action :authenticate_user!, only: [:resend]
 
-  # POST /api/v1/confirmations/confirm
+  # POST /api/v1/confirmation/confirm
   def confirm
     token = params[:confirmation_token] || params[:token]
     user = User.find_by(confirmation_token: token)
@@ -44,7 +44,7 @@ class Api::V1::ConfirmationsController < ApplicationController
     end
   end
 
-  # POST /api/v1/confirmations/resend
+  # POST /api/v1/confirmation/resend
   def resend
     if current_user.confirmed?
       render json: {
@@ -62,8 +62,8 @@ class Api::V1::ConfirmationsController < ApplicationController
     }, status: :ok
   end
 
-  # POST /api/v1/confirmations/send
-  def send_confirmation
+  # POST /api/v1/confirmation/send_email
+  def send_email
     user = User.find_by(email: params[:email])
 
     if user.nil?

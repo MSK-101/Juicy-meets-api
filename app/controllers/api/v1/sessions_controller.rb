@@ -6,16 +6,19 @@ class Api::V1::SessionsController < ApplicationController
     user = User.find_by(email: session_params[:email])
 
     if user && user.valid_password?(session_params[:password])
-      # Check if user's email is confirmed
-      unless user.confirmed?
+      # Check if user's email is confirmed (except for OAuth users)
+      unless user.confirmed? || user.oauth_user?
         render json: {
           success: false,
           message: 'Please confirm your email address before signing in',
-          confirmation_required: true,
-          user: {
-            id: user.id,
-            email: user.email,
-            confirmed: false
+          data: {
+            confirmation_required: true,
+            user: {
+              id: user.id,
+              email: user.email,
+              confirmed: false,
+              oauth_user: user.oauth_user?
+            }
           }
         }, status: :unauthorized
         return
@@ -27,19 +30,16 @@ class Api::V1::SessionsController < ApplicationController
 
       render json: {
         success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          confirmed: user.confirmed?,
-          created_at: user.created_at,
-          profile_completed: user.profile_completed
-        },
-        token: token,
-        message: 'Successfully signed in'
+        message: 'Successfully signed in',
+        data: {
+          user: user_response(user),
+          token: token
+        }
       }
     else
       render json: {
         success: false,
+        message: 'Invalid email or password',
         errors: ['Invalid email or password']
       }, status: :unauthorized
     end
@@ -49,9 +49,16 @@ class Api::V1::SessionsController < ApplicationController
   def destroy
     if current_user
       warden.logout
-      render json: { message: 'Successfully signed out' }
+      render json: {
+        success: true,
+        message: 'Successfully signed out'
+      }
     else
-      render json: { error: 'No user signed in' }, status: :unauthorized
+      render json: {
+        success: false,
+        message: 'No user signed in',
+        errors: ['No active session found']
+      }, status: :unauthorized
     end
   end
 
@@ -63,5 +70,19 @@ class Api::V1::SessionsController < ApplicationController
 
   def warden
     request.env['warden']
+  end
+
+  def user_response(user)
+    {
+      id: user.id,
+      email: user.email,
+      provider: user.provider,
+      oauth_user: user.oauth_user?,
+      confirmed: user.confirmed?,
+      confirmed_at: user.confirmed_at,
+      profile_completed: user.profile_completed?,
+      created_at: user.created_at,
+      updated_at: user.updated_at
+    }
   end
 end

@@ -6,15 +6,15 @@ class User < ApplicationRecord
          :confirmable, :omniauthable,
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
 
-  # Enums for profile fields
-  enum gender: {
+  # Enums for profile fields (Rails 8.0 compatible syntax)
+  enum :gender, {
     male: 0,
     female: 1,
     non_binary: 2,
     prefer_not_to_say: 3
   }
 
-  enum interested_in: {
+  enum :interested_in, {
     men: 0,
     women: 1,
     everyone: 2

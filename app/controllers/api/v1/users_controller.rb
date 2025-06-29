@@ -1,31 +1,22 @@
 class Api::V1::UsersController < ApplicationController
   skip_before_action :authenticate_user!, only: [:create]
 
-  # GET /api/v1/users/profile
-  def profile
-    render json: {
-      user: user_response(current_user)
-    }
-  end
-
   # POST /api/v1/users
   def create
     user = User.new(user_params)
 
     if user.save
-      # Send confirmation email
-      user.send_confirmation_instructions
+      # Send confirmation email (only for non-OAuth users)
+      user.send_confirmation_instructions unless user.oauth_user?
 
       render json: {
         success: true,
-        user: {
-          id: user.id,
-          email: user.email,
-          confirmed: user.confirmed?,
-          confirmation_sent: true,
-          created_at: user.created_at
+        data: {
+          user: user_response(user)
         },
-        message: 'User successfully created. Please check your email for confirmation instructions.'
+        message: user.oauth_user? ?
+          'User successfully created with OAuth.' :
+          'User successfully created. Please check your email for confirmation instructions.'
       }, status: :created
     else
       render json: {
@@ -35,17 +26,14 @@ class Api::V1::UsersController < ApplicationController
     end
   end
 
-  # PUT /api/v1/users/complete_profile
-  def complete_profile
-    if current_user.update(profile_params)
-      current_user.complete_profile!
-      render json: {
-        user: user_response(current_user),
-        message: 'Profile completed successfully'
+  # GET /api/v1/users/me
+  def show
+    render json: {
+      success: true,
+      data: {
+        user: user_response(current_user)
       }
-    else
-      render json: { errors: current_user.errors.full_messages }, status: :unprocessable_entity
-    end
+    }
   end
 
   private
@@ -54,23 +42,17 @@ class Api::V1::UsersController < ApplicationController
     params.require(:user).permit(:email, :password, :password_confirmation)
   end
 
-  def profile_params
-    params.require(:user).permit(:age, :gender, :interested_in)
-  end
-
   def user_response(user)
     {
       id: user.id,
       email: user.email,
       provider: user.provider,
+      oauth_user: user.oauth_user?,
       confirmed: user.confirmed?,
       confirmed_at: user.confirmed_at,
-      oauth_user: user.oauth_user?,
-      age: user.age,
-      gender: user.gender,
-      interested_in: user.interested_in,
-      profile_completed: user.profile_completed,
-      created_at: user.created_at
+      profile_completed: user.profile_completed?,
+      created_at: user.created_at,
+      updated_at: user.updated_at
     }
   end
 end

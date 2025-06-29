@@ -3,35 +3,44 @@ Rails.application.routes.draw do
 
   # OAuth routes (standard omniauth paths)
   get '/auth/:provider/callback', to: 'api/v1/omniauth_callbacks#google_oauth2'
+  post '/auth/:provider/callback', to: 'api/v1/omniauth_callbacks#google_oauth2' # For development testing
   get '/auth/failure', to: 'api/v1/omniauth_callbacks#failure'
 
   namespace :api do
     namespace :v1 do
+      # Authentication routes - Simple and clear
       post 'login', to: 'sessions#create'
       delete 'logout', to: 'sessions#destroy'
 
-      resources :users, only: [:create] do
+      # User management - RESTful
+      resources :users, only: [:create, :show] do
         collection do
-          get 'profile'
-          put 'complete_profile'
+          get :me  # /api/v1/users/me -> users#show
         end
       end
 
-      # Email confirmation routes
-      post 'confirmations/confirm', to: 'confirmations#confirm'
-      post 'confirmations/resend', to: 'confirmations#resend'
-      post 'confirmations/send', to: 'confirmations#send_confirmation'
+      # Profile management - Singular resource (one profile per user)
+      resource :profile, only: [:show, :update] do
+        get :status  # /api/v1/profile/status
+      end
 
-      # OAuth routes
-      get 'auth/google', to: redirect('/auth/google_oauth2')
-      get 'auth/google_oauth2/callback', to: 'omniauth_callbacks#google_oauth2'
-      get 'auth/oauth_urls', to: 'auth#oauth_urls'
-      get 'auth/providers', to: 'auth#providers'
-      post 'auth/simulate_oauth', to: 'auth#simulate_oauth'
+      # Email confirmations - RESTful nested resource
+      resource :confirmation, only: [] do
+        member do
+          post :confirm     # /api/v1/confirmation/confirm
+          post :resend      # /api/v1/confirmation/resend
+          post :send_email  # /api/v1/confirmation/send_email
+        end
+      end
+
+      # Authentication info - Organized namespace
+      namespace :auth do
+        get :providers    # /api/v1/auth/providers
+        get :oauth_urls   # /api/v1/auth/oauth_urls
+        get 'google', to: redirect('/auth/google_oauth2')
+      end
     end
   end
-
-  # Define your application routes per the DSL in https://guides.rubyonrails.org/routing.html
 
   # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
   # Can be used by load balancers and uptime monitors to verify that the app is live.
