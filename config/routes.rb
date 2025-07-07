@@ -48,4 +48,7 @@ Rails.application.routes.draw do
 
   # Defines the root path route ("/")
   # root "posts#index"
+
+  # Mount ActionCable for WebSocket signaling
+  mount ActionCable.server => '/cable'
 end
