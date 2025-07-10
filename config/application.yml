@@ -1,0 +1,5 @@
+# Example TURN/STUN envs for reference
+NEXT_PUBLIC_STUN_URL: stun:stun.l.google.com:19302
+NEXT_PUBLIC_TURN_URL: turn:global.relay.metered.ca:80
+NEXT_PUBLIC_TURN_USERNAME: efb0b7b7b6b0b7b7b7b7b7b7
+NEXT_PUBLIC_TURN_CREDENTIAL: efb0b7b7b7b7b7b7b7b7b7b7b7b7b7b7
