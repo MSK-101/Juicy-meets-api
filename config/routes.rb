@@ -39,6 +39,29 @@ Rails.application.routes.draw do
         get :oauth_urls   # /api/v1/auth/oauth_urls
         get 'google', to: redirect('/auth/google_oauth2')
       end
+
+      # Coin system routes
+      resources :coin_packages, only: [:index, :show]
+      resources :coin_deduction_rules, only: [:index]
+
+      # User coins and transactions
+      namespace :user_coins do
+        get :balance
+        get :transactions
+        get :purchase_history
+      end
+
+      # Purchases
+      resources :purchases, only: [:create]
+    end
+  end
+
+  # Admin routes (outside v1 namespace to match controller structure)
+  namespace :api do
+    namespace :admin do
+      get :dashboard, to: 'dashboard#index'
+      resources :coin_packages
+      resources :coin_deduction_rules
     end
   end
 

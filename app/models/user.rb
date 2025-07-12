@@ -20,6 +20,12 @@ class User < ApplicationRecord
     everyone: 2
   }
 
+  # Coin system associations
+  has_one :user_coins, dependent: :destroy
+  has_many :user_coin_purchases, dependent: :destroy
+  has_many :coin_transactions, dependent: :destroy
+  has_many :coin_packages, through: :user_coin_purchases
+
   # Validations
   validates :age, presence: true, numericality: { greater_than_or_equal_to: 18, less_than_or_equal_to: 100 }, if: :profile_completed?
   validates :gender, presence: true, if: :profile_completed?
@@ -76,5 +82,33 @@ class User < ApplicationRecord
   # Custom message when user is not confirmed
   def inactive_message
     (confirmed? || oauth_user?) ? super : :unconfirmed
+  end
+
+  # Coin system methods
+  def available_coins
+    user_coins&.available_coins || 0
+  end
+
+  def has_coins?
+    user_coins&.has_coins? || false
+  end
+
+  def can_afford_coins?(amount)
+    user_coins&.can_afford?(amount) || false
+  end
+
+  def deduct_coins_for_video_call(duration_seconds)
+    return 0 unless user_coins
+    user_coins.deduct_coins_for_video_call(duration_seconds)
+  end
+
+  def add_coins(amount, transaction_type = 'bonus', reference = nil)
+    user_coins || create_user_coins!
+    user_coins.add_coins(amount, transaction_type, reference)
+  end
+
+  def deduct_coins(amount, transaction_type = 'deduction', reference = nil)
+    return false unless user_coins
+    user_coins.deduct_coins(amount, transaction_type, reference)
   end
 end

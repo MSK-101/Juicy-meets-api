@@ -14,12 +14,90 @@ ActiveRecord::Schema[7.2].define(version: 2025_06_29_170042) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
+  create_table "coin_deduction_rules", force: :cascade do |t|
+    t.string "name", null: false
+    t.integer "duration_seconds", null: false
+    t.integer "coins_deducted", null: false
+    t.boolean "active", default: true
+    t.text "description"
+    t.integer "sort_order", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["active"], name: "index_coin_deduction_rules_on_active"
+    t.index ["sort_order"], name: "index_coin_deduction_rules_on_sort_order"
+  end
+
+  create_table "coin_packages", force: :cascade do |t|
+    t.string "name", null: false
+    t.decimal "price", precision: 10, scale: 2, null: false
+    t.integer "coins_count", null: false
+    t.boolean "active", default: true
+    t.text "description"
+    t.integer "sort_order", default: 0
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["active"], name: "index_coin_packages_on_active"
+    t.index ["sort_order"], name: "index_coin_packages_on_sort_order"
+  end
+
+  create_table "coin_transactions", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "transaction_type", null: false
+    t.integer "amount", null: false
+    t.integer "balance_after", null: false
+    t.bigint "coin_package_id"
+    t.bigint "coin_deduction_rule_id"
+    t.bigint "user_coin_purchase_id"
+    t.string "reference_id"
+    t.text "description"
+    t.jsonb "metadata", default: {}
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["coin_deduction_rule_id"], name: "index_coin_transactions_on_coin_deduction_rule_id"
+    t.index ["coin_package_id"], name: "index_coin_transactions_on_coin_package_id"
+    t.index ["metadata"], name: "index_coin_transactions_on_metadata", using: :gin
+    t.index ["reference_id"], name: "index_coin_transactions_on_reference_id"
+    t.index ["transaction_type"], name: "index_coin_transactions_on_transaction_type"
+    t.index ["user_coin_purchase_id"], name: "index_coin_transactions_on_user_coin_purchase_id"
+    t.index ["user_id"], name: "index_coin_transactions_on_user_id"
+  end
+
   create_table "jwt_denylists", force: :cascade do |t|
     t.string "jti"
     t.datetime "exp"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["jti"], name: "index_jwt_denylists_on_jti"
+  end
+
+  create_table "user_coin_purchases", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.bigint "coin_package_id", null: false
+    t.integer "coins_count", null: false
+    t.decimal "price", precision: 10, scale: 2, null: false
+    t.string "transaction_id"
+    t.string "payment_status", default: "pending"
+    t.datetime "purchased_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["coin_package_id"], name: "index_user_coin_purchases_on_coin_package_id"
+    t.index ["payment_status"], name: "index_user_coin_purchases_on_payment_status"
+    t.index ["purchased_at"], name: "index_user_coin_purchases_on_purchased_at"
+    t.index ["transaction_id"], name: "index_user_coin_purchases_on_transaction_id"
+    t.index ["user_id"], name: "index_user_coin_purchases_on_user_id"
+  end
+
+  create_table "user_coins", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.integer "balance", default: 0, null: false
+    t.integer "total_earned", default: 0, null: false
+    t.integer "total_spent", default: 0, null: false
+    t.datetime "last_activity_at"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["balance"], name: "index_user_coins_on_balance"
+    t.index ["last_activity_at"], name: "index_user_coins_on_last_activity_at"
+    t.index ["user_id"], name: "index_user_coins_on_user_id"
   end
 
   create_table "users", force: :cascade do |t|
@@ -45,4 +123,12 @@ ActiveRecord::Schema[7.2].define(version: 2025_06_29_170042) do
     t.index ["provider", "uid"], name: "index_users_on_provider_and_uid", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
   end
+
+  add_foreign_key "coin_transactions", "coin_deduction_rules"
+  add_foreign_key "coin_transactions", "coin_packages"
+  add_foreign_key "coin_transactions", "user_coin_purchases"
+  add_foreign_key "coin_transactions", "users"
+  add_foreign_key "user_coin_purchases", "coin_packages"
+  add_foreign_key "user_coin_purchases", "users"
+  add_foreign_key "user_coins", "users"
 end
