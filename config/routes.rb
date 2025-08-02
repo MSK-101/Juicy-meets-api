@@ -61,6 +61,20 @@ Rails.application.routes.draw do
 
   # Admin routes (outside v1 namespace to match controller structure)
   namespace :api do
+    namespace :v1 do
+      namespace :admin do
+        # Admin authentication routes
+        namespace :auth do
+          post :login
+          delete :logout
+          get :me
+        end
+      end
+    end
+  end
+
+  # Admin routes (outside v1 namespace to match controller structure)
+  namespace :api do
     namespace :admin do
       get :dashboard, to: 'dashboard#index'
       resources :coin_packages

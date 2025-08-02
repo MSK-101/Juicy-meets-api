@@ -93,4 +93,7 @@ if Rails.env.development?
   puts "Test user created: #{test_user.email}"
 end
 
+# Load admin seeds
+load(Rails.root.join('db', 'seeds', 'admin_seeds.rb'))
+
 puts "Seed data created successfully!"
