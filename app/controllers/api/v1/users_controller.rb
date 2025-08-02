@@ -5,10 +5,10 @@ class Api::V1::UsersController < ApplicationController
   def create
     user = User.new(user_params)
 
-    if user.save
-      # Send confirmation email (only for non-OAuth users)
-      user.send_confirmation_instructions unless user.oauth_user?
+    # Automatically confirm users (email confirmation disabled)
+    user.confirmed_at = Time.current
 
+    if user.save
       render json: {
         success: true,
         data: {
@@ -16,7 +16,7 @@ class Api::V1::UsersController < ApplicationController
         },
         message: user.oauth_user? ?
           'User successfully created with OAuth.' :
-          'User successfully created. Please check your email for confirmation instructions.'
+          'User successfully created.'
       }, status: :created
     else
       render json: {
@@ -39,7 +39,7 @@ class Api::V1::UsersController < ApplicationController
   private
 
   def user_params
-    params.require(:user).permit(:email, :password, :password_confirmation)
+    params.require(:user).permit(:email)
   end
 
   def user_response(user)
@@ -48,9 +48,10 @@ class Api::V1::UsersController < ApplicationController
       email: user.email,
       provider: user.provider,
       oauth_user: user.oauth_user?,
-      confirmed: user.confirmed?,
+      confirmed: true, # Always true since confirmation is disabled
       confirmed_at: user.confirmed_at,
       profile_completed: user.profile_completed?,
+      role: user.role,
       created_at: user.created_at,
       updated_at: user.updated_at
     }

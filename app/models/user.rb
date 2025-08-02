@@ -3,7 +3,7 @@ class User < ApplicationRecord
   # :lockable, :timeoutable, :trackable
   devise :database_authenticatable, :registerable,
          :recoverable, :rememberable, :validatable,
-         :confirmable, :omniauthable,
+         :omniauthable,
          :jwt_authenticatable, jwt_revocation_strategy: JwtDenylist
 
   # Enums for profile fields (Rails 8.0 compatible syntax)
@@ -44,12 +44,51 @@ class User < ApplicationRecord
       user.uid = auth.uid
       # OAuth users are automatically confirmed
       user.confirmed_at = Time.current
-      user.skip_confirmation!
     end
+  end
+
+  # Generate random password for new users
+  def self.generate_random_password
+    SecureRandom.alphanumeric(8)
+  end
+
+  # Send password email
+  def send_password_email
+    UserMailer.password_email(self, password).deliver_now
+  end
+
+  # Send forgot password email with new password
+  def send_forgot_password_email
+    new_password = User.generate_random_password
+    update(password: new_password)
+    UserMailer.forgot_password_email(self, new_password).deliver_now
   end
 
   def oauth_user?
     provider.present? && uid.present?
+  end
+
+  # Email confirmation methods (simplified since confirmation is disabled)
+  def confirmed?
+    true # Always return true since confirmation is disabled
+  end
+
+  def confirmation_pending?
+    false # Always return false since confirmation is disabled
+  end
+
+  def confirmation_required_for_signed_in?
+    false # Always return false since confirmation is disabled
+  end
+
+  # Override active_for_authentication to not require confirmation
+  def active_for_authentication?
+    super # Allow all users to authenticate
+  end
+
+  # Custom message when user is not confirmed
+  def inactive_message
+    super # Use default message
   end
 
   # Methods
@@ -59,29 +98,6 @@ class User < ApplicationRecord
 
   def complete_profile!
     update!(profile_completed: true) if profile_complete?
-  end
-
-  # Email confirmation methods
-  def confirmed?
-    confirmed_at.present?
-  end
-
-  def confirmation_pending?
-    !confirmed? && confirmation_token.present?
-  end
-
-  def confirmation_required_for_signed_in?
-    !confirmed?
-  end
-
-  # Override active_for_authentication to require confirmation (except for OAuth users)
-  def active_for_authentication?
-    super && (confirmed? || oauth_user?)
-  end
-
-  # Custom message when user is not confirmed
-  def inactive_message
-    (confirmed? || oauth_user?) ? super : :unconfirmed
   end
 
   # Coin system methods

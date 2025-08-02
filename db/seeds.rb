@@ -81,4 +81,16 @@ end
 
 puts "Created #{CoinDeductionRule.count} deduction rules"
 
+# Create test user for development
+if Rails.env.development?
+  test_user = User.find_or_create_by(email: 'test@example.com') do |user|
+    user.password = 'password123'
+    user.password_confirmation = 'password123'
+    user.confirmed_at = Time.current
+    user.role = 'user'
+  end
+
+  puts "Test user created: #{test_user.email}"
+end
+
 puts "Seed data created successfully!"

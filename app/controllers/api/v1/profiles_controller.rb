@@ -61,8 +61,8 @@ class Api::V1::ProfilesController < ApplicationController
       email: user.email,
       provider: user.provider,
       oauth_user: user.oauth_user?,
-      confirmed: user.confirmed?,
-      confirmed_at: user.confirmed_at,
+      # confirmed: user.confirmed?, # Temporarily disabled
+      # confirmed_at: user.confirmed_at, # Temporarily disabled
       age: user.age,
       gender: user.gender,
       interested_in: user.interested_in,

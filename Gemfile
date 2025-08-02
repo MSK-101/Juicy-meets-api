@@ -48,4 +48,7 @@ group :development, :test do
 
   # Omakase Ruby styling [https://github.com/rails/rubocop-rails-omakase/]
   gem "rubocop-rails-omakase", require: false
+
+  # Letter Opener for viewing emails in browser during development
+  gem "letter_opener"
 end
