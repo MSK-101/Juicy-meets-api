@@ -16,7 +16,7 @@ class Api::V1::Admin::AuthController < ApplicationController
           role: admin.role,
           exp: 24.hours.from_now.to_i
         },
-        Rails.application.credentials.secret_key_base
+        Rails.application.secret_key_base
       )
 
       render json: {

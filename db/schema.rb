@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_08_02_164908) do
+ActiveRecord::Schema[7.2].define(version: 2025_08_03_212050) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -107,6 +107,28 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_02_164908) do
     t.index ["jti"], name: "index_jwt_denylists_on_jti"
   end
 
+  create_table "pools", force: :cascade do |t|
+    t.string "name", null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["active"], name: "index_pools_on_active"
+  end
+
+  create_table "sequences", force: :cascade do |t|
+    t.integer "video_count", default: 0, null: false
+    t.boolean "active", default: true, null: false
+    t.integer "position", default: 0, null: false
+    t.bigint "pool_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "name"
+    t.index ["active"], name: "index_sequences_on_active"
+    t.index ["pool_id", "position"], name: "index_sequences_on_pool_id_and_position"
+    t.index ["pool_id"], name: "index_sequences_on_pool_id"
+    t.index ["position"], name: "index_sequences_on_position"
+  end
+
   create_table "user_coin_purchases", force: :cascade do |t|
     t.bigint "user_id", null: false
     t.bigint "coin_package_id", null: false
@@ -163,13 +185,35 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_02_164908) do
     t.index ["role"], name: "index_users_on_role"
   end
 
+  create_table "videos", force: :cascade do |t|
+    t.string "name", null: false
+    t.integer "gender", default: 0, null: false
+    t.integer "status", default: 0, null: false
+    t.bigint "sequence_id", null: false
+    t.bigint "pool_id", null: false
+    t.bigint "admin_id", null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["admin_id"], name: "index_videos_on_admin_id"
+    t.index ["gender"], name: "index_videos_on_gender"
+    t.index ["pool_id", "status"], name: "index_videos_on_pool_id_and_status"
+    t.index ["pool_id"], name: "index_videos_on_pool_id"
+    t.index ["sequence_id", "status"], name: "index_videos_on_sequence_id_and_status"
+    t.index ["sequence_id"], name: "index_videos_on_sequence_id"
+    t.index ["status"], name: "index_videos_on_status"
+  end
+
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
   add_foreign_key "coin_transactions", "coin_deduction_rules"
   add_foreign_key "coin_transactions", "coin_packages"
   add_foreign_key "coin_transactions", "user_coin_purchases"
   add_foreign_key "coin_transactions", "users"
+  add_foreign_key "sequences", "pools"
   add_foreign_key "user_coin_purchases", "coin_packages"
   add_foreign_key "user_coin_purchases", "users"
   add_foreign_key "user_coins", "users"
+  add_foreign_key "videos", "admins"
+  add_foreign_key "videos", "pools"
+  add_foreign_key "videos", "sequences"
 end

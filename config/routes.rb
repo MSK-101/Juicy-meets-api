@@ -56,6 +56,22 @@ Rails.application.routes.draw do
 
       # Purchases
       resources :purchases, only: [:create]
+
+      # Algorithm management routes
+      resources :pools, only: [:index, :show, :create, :update, :destroy] do
+        resources :sequences, only: [:index, :show, :create, :update, :destroy] do
+          collection do
+            patch :reorder
+          end
+        end
+      end
+
+      # Video management routes
+      resources :videos, only: [:index, :show, :create, :update, :destroy] do
+        collection do
+          get :filters
+        end
+      end
     end
   end
 

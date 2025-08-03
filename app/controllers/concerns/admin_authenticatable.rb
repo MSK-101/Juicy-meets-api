@@ -9,14 +9,22 @@ module AdminAuthenticatable
 
   def authenticate_admin!
     token = extract_token_from_header
+    Rails.logger.info "Admin auth: Token extracted: #{token ? 'present' : 'missing'}"
+    Rails.logger.info "Admin auth: Authorization header: #{request.headers['Authorization']}"
     return render_unauthorized unless token
 
     begin
-      decoded_token = JWT.decode(token, Rails.application.credentials.secret_key_base, true, { algorithm: 'HS256' })
+      decoded_token = JWT.decode(token, Rails.application.secret_key_base, true, { algorithm: 'HS256' })
       admin_data = decoded_token.first
+      Rails.logger.info "Admin auth: Decoded token data: #{admin_data}"
 
       @current_admin = Admin.find(admin_data['admin_id'])
-    rescue JWT::DecodeError, ActiveRecord::RecordNotFound
+      Rails.logger.info "Admin auth: Admin found: #{@current_admin.email}"
+    rescue JWT::DecodeError => e
+      Rails.logger.error "Admin auth: JWT decode error: #{e.message}"
+      render_unauthorized
+    rescue ActiveRecord::RecordNotFound => e
+      Rails.logger.error "Admin auth: Admin not found: #{e.message}"
       render_unauthorized
     end
   end
