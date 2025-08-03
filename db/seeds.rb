@@ -10,39 +10,25 @@
 puts "Creating coin packages..."
 coin_packages = [
   {
-    name: "Starter Pack",
-    price: 4.99,
-    coins_count: 100,
-    description: "Perfect for trying out video chat",
+    name: "Bronze",
+    price: 10.00,
+    coins_count: 200,
+    description: "Basic package for new users",
     sort_order: 1
   },
   {
-    name: "Popular Pack",
-    price: 9.99,
-    coins_count: 250,
-    description: "Most popular choice for regular users",
+    name: "Silver",
+    price: 15.00,
+    coins_count: 300,
+    description: "Popular choice for regular users",
     sort_order: 2
   },
   {
-    name: "Value Pack",
-    price: 19.99,
-    coins_count: 600,
-    description: "Best value for money",
+    name: "Gold",
+    price: 25.00,
+    coins_count: 400,
+    description: "Premium package for power users",
     sort_order: 3
-  },
-  {
-    name: "Premium Pack",
-    price: 39.99,
-    coins_count: 1500,
-    description: "For power users who chat frequently",
-    sort_order: 4
-  },
-  {
-    name: "Mega Pack",
-    price: 79.99,
-    coins_count: 3500,
-    description: "Maximum value for heavy users",
-    sort_order: 5
   }
 ]
 
@@ -54,33 +40,6 @@ end
 
 puts "Created #{CoinPackage.count} coin packages"
 
-# Create coin deduction rules
-puts "Creating coin deduction rules..."
-deduction_rules = [
-  {
-    name: "Standard Video Call",
-    duration_seconds: 60, # 1 minute
-    coins_deducted: 10,
-    description: "Standard deduction for video calls",
-    sort_order: 1
-  },
-  {
-    name: "Premium Video Call",
-    duration_seconds: 300, # 5 minutes
-    coins_deducted: 50,
-    description: "Premium deduction for longer calls",
-    sort_order: 2
-  }
-]
-
-deduction_rules.each do |rule_data|
-  CoinDeductionRule.find_or_create_by(name: rule_data[:name]) do |rule|
-    rule.assign_attributes(rule_data)
-  end
-end
-
-puts "Created #{CoinDeductionRule.count} deduction rules"
-
 # Create test user for development
 if Rails.env.development?
   test_user = User.find_or_create_by(email: 'test@example.com') do |user|
@@ -88,6 +47,7 @@ if Rails.env.development?
     user.password_confirmation = 'password123'
     user.confirmed_at = Time.current
     user.role = 'user'
+    user.coin_balance = 0
   end
 
   puts "Test user created: #{test_user.email}"

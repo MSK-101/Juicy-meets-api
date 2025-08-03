@@ -1,8 +1,7 @@
-class UserCoinPurchase < ApplicationRecord
+class Purchase < ApplicationRecord
   # Associations
   belongs_to :user
   belongs_to :coin_package
-  has_many :coin_transactions, dependent: :restrict_with_error
 
   # Enums
   enum payment_status: {
@@ -19,7 +18,6 @@ class UserCoinPurchase < ApplicationRecord
 
   # Callbacks
   before_create :set_purchased_at
-  after_create :create_coin_transaction, if: :completed?
 
   # Scopes
   scope :completed, -> { where(payment_status: 'completed') }
@@ -35,13 +33,22 @@ class UserCoinPurchase < ApplicationRecord
     (coins_count / price).round(2)
   end
 
+  def refund!
+    return false unless completed?
+
+    transaction do
+      update!(payment_status: 'refunded')
+      user.deduct_coins(coins_count, 'refund', self)
+    end
+    true
+  rescue => e
+    Rails.logger.error "Failed to refund purchase: #{e.message}"
+    false
+  end
+
   private
 
   def set_purchased_at
     self.purchased_at = Time.current
-  end
-
-  def create_coin_transaction
-    user.user_coins.add_coins(coins_count, 'purchase', self)
   end
 end

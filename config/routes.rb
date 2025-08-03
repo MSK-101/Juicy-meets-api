@@ -45,14 +45,6 @@ Rails.application.routes.draw do
 
       # Coin system routes
       resources :coin_packages, only: [:index, :show]
-      resources :coin_deduction_rules, only: [:index]
-
-      # User coins and transactions
-      namespace :user_coins do
-        get :balance
-        get :transactions
-        get :purchase_history
-      end
 
       # Purchases
       resources :purchases, only: [:create]
@@ -94,7 +86,6 @@ Rails.application.routes.draw do
     namespace :admin do
       get :dashboard, to: 'dashboard#index'
       resources :coin_packages
-      resources :coin_deduction_rules
     end
   end
 
