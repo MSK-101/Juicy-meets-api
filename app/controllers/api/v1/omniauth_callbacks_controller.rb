@@ -93,7 +93,7 @@ class Api::V1::OmniauthCallbacksController < ApplicationController
       provider: user.provider,
       confirmed: user.confirmed?,
       confirmed_at: user.confirmed_at,
-      oauth_user: user.oauth_user?,
+      oauth_user: false,
       age: user.age,
       gender: user.gender,
       interested_in: user.interested_in,

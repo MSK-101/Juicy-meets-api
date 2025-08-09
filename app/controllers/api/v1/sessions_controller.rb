@@ -59,7 +59,7 @@ class Api::V1::SessionsController < ApplicationController
       id: user.id,
       email: user.email,
       provider: user.provider,
-      oauth_user: user.oauth_user?,
+      oauth_user: false,
       confirmed: true, # Always true since confirmation is disabled
       confirmed_at: user.confirmed_at,
       profile_completed: user.profile_completed?,

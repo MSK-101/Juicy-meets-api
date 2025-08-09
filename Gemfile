@@ -37,6 +37,9 @@ gem "kaminari"
 gem "devise"
 gem "devise-jwt"
 
+# Serialization
+gem "blueprinter"
+
 # OAuth
 gem "omniauth"
 gem "omniauth-google-oauth2"

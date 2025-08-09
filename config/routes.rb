@@ -77,6 +77,8 @@ Rails.application.routes.draw do
           delete :logout
           get :me
         end
+
+        resources :deduction_rules
       end
     end
   end

@@ -21,6 +21,23 @@ class User < ApplicationRecord
   scope :active, -> { where(profile_completed: true) }
   scope :with_coins, -> { where('coin_balance > 0') }
 
+    # Generate random password for new users
+  def self.generate_random_password
+    SecureRandom.alphanumeric(8)
+  end
+
+    # Send password email
+  def send_password_email
+    UserMailer.password_email(self, password).deliver_now
+  end
+
+    # Send forgot password email with new password
+  def send_forgot_password_email
+    new_password = User.generate_random_password
+    update(password: new_password)
+    UserMailer.forgot_password_email(self, new_password).deliver_now
+  end
+
   # Instance methods
   def add_coins(amount, reason = 'purchase', reference = nil)
     return false if amount <= 0

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_08_03_212050) do
+ActiveRecord::Schema[7.2].define(version: 2025_08_04_000000) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -78,6 +78,17 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_03_212050) do
     t.index ["transaction_type"], name: "index_coin_transactions_on_transaction_type"
     t.index ["user_id", "created_at"], name: "index_coin_transactions_on_user_id_and_created_at"
     t.index ["user_id"], name: "index_coin_transactions_on_user_id"
+  end
+
+  create_table "deduction_rules", force: :cascade do |t|
+    t.string "name"
+    t.integer "threshold_seconds", null: false
+    t.integer "coins", null: false
+    t.boolean "active", default: true, null: false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["active"], name: "index_deduction_rules_on_active"
+    t.index ["threshold_seconds"], name: "index_deduction_rules_on_threshold_seconds", unique: true
   end
 
   create_table "jwt_denylists", force: :cascade do |t|

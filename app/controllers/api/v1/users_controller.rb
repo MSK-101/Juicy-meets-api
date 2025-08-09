@@ -14,7 +14,7 @@ class Api::V1::UsersController < ApplicationController
         data: {
           user: user_response(user)
         },
-        message: user.oauth_user? ?
+        message: false ?
           'User successfully created with OAuth.' :
           'User successfully created.'
       }, status: :created
@@ -47,7 +47,7 @@ class Api::V1::UsersController < ApplicationController
       id: user.id,
       email: user.email,
       provider: user.provider,
-      oauth_user: user.oauth_user?,
+      oauth_user: false,
       confirmed: true, # Always true since confirmation is disabled
       confirmed_at: user.confirmed_at,
       profile_completed: user.profile_completed?,
