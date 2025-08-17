@@ -4,7 +4,7 @@ class ApplicationController < ActionController::API
   include Devise::Controllers::Helpers
 
   before_action :set_session_store
-  before_action :authenticate_user! # Register globally so skip_before_action works
+  # before_action :authenticate_user! # Register globally so skip_before_action works
 
   respond_to :json
 

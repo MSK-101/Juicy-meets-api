@@ -1,4 +1,7 @@
 Rails.application.routes.draw do
+  # ActionCable WebSocket endpoint (removed - using PubNub for video chat)
+  # mount ActionCable.server => '/cable'
+
   devise_for :users, skip: :all
 
   # OAuth routes (standard omniauth paths)
@@ -49,6 +52,14 @@ Rails.application.routes.draw do
       # Purchases
       resources :purchases, only: [:create]
 
+      # Video Chat routes - Simple backend-controlled matching
+      namespace :video_chat do
+        post :join           # Join video chat queue
+        get :status          # Check match status
+        post :leave          # Leave chat
+        # Note: WebRTC signaling handled by PubNub on frontend
+      end
+
       # Algorithm management routes
       resources :pools, only: [:index, :show, :create, :update, :destroy] do
         resources :sequences, only: [:index, :show, :create, :update, :destroy] do
@@ -64,6 +75,13 @@ Rails.application.routes.draw do
           get :filters
         end
       end
+
+      # Video chat routes (removed - using PubNub for real-time communication)
+      # namespace :video_chat do
+      #   post :create_connection
+      #   post :join_connection
+      #   get :connection_status, to: 'video_chat#connection_status'
+      # end
     end
   end
 

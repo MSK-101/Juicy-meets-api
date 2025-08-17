@@ -1,6 +1,6 @@
 class Api::V1::CoinPackagesController < ApplicationController
   # Public endpoint - no authentication required
-  skip_before_action :authenticate_user!, if: -> { action_name == 'index' }
+  # skip_before_action :authenticate_user!, if: -> { action_name == 'index' }
 
   # GET /api/v1/coin_packages
   def index
