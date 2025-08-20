@@ -97,6 +97,11 @@ Rails.application.routes.draw do
         end
 
         resources :deduction_rules
+        resources :staff, only: [:index, :show, :create, :update, :destroy] do
+          collection do
+            get :available
+          end
+        end
       end
     end
   end
