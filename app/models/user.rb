@@ -1,22 +1,30 @@
 class User < ApplicationRecord
   devise :database_authenticatable, :registerable,
          :recoverable, :rememberable, :validatable,
-         :confirmable, :omniauthable, omniauth_providers: [:google_oauth2]
+         :confirmable, :omniauthable,
+         omniauth_providers: [:google_oauth2]
+
+  # Basic JWT configuration - temporarily disabled
+  # :jwt_authenticatable
 
   # Associations
   has_many :purchases, dependent: :destroy
   has_many :coin_packages, through: :purchases
   has_many :coin_transactions, dependent: :destroy
   has_one :staff_assignment, dependent: :destroy
+  has_many :user_ip_addresses, dependent: :destroy
 
   # Validations
   validates :email, presence: true, uniqueness: true
   validates :coin_balance, numericality: { greater_than_or_equal_to: 0 }
 
+  # Callbacks
+  before_save :update_last_activity, if: :status_changed?
+
   # Enums
-  enum gender: { male: 0, female: 1, other: 2 }
-  enum role: { user: 0, staff: 1 }
+  enum role: { user: 0, staff: 1}
   enum status: { offline: 0, online: 1, in_chat: 2, busy: 3 }
+  enum user_status: { pending: 0, active: 1, suspended: 2 }
 
   # Scopes
   scope :active, -> { where(profile_completed: true) }
@@ -27,9 +35,6 @@ class User < ApplicationRecord
   scope :online, -> { where(status: [:online, :in_chat]) }
   scope :available_staff, -> { staff.online.where.not(status: [:in_chat, :busy]) }
 
-  # Callbacks
-  before_save :update_last_activity, if: :status_changed?
-
   # Generate random password for new users
   def self.generate_random_password
     SecureRandom.alphanumeric(8)
@@ -38,6 +43,30 @@ class User < ApplicationRecord
   # Send password email
   def send_password_email
     UserMailer.password_email(self, password).deliver_now
+  end
+
+  # Free coin distribution logic
+  def self.can_give_free_coins_to_ip?(ip_address)
+    return false unless ip_address.present?
+    !UserIpAddress.ip_used_for_free_coins?(ip_address)
+  end
+
+  # Give free coins to user and track IP
+  def give_free_coins_and_track_ip!(ip_address)
+    return false unless ip_address.present?
+    return false if coin_balance > 0
+
+    # Check if IP is eligible
+    return false unless User.can_give_free_coins_to_ip?(ip_address)
+
+    # Give coins
+    amount = ENV.fetch('FREE_COINS_AMOUNT', '100').to_i
+    add_coins(amount, 'free_coins', nil)
+
+    # Track IP
+    user_ip_addresses.create!(ip_address: ip_address)
+
+    { success: true, coins_given: amount, message: "Free coins distributed" }
   end
 
   def is_staff?
@@ -84,9 +113,11 @@ class User < ApplicationRecord
       update!(coin_balance: coin_balance + amount)
       coin_transactions.create!(
         amount: amount,
+        balance_after: coin_balance,
         transaction_type: 'credit',
-        reason: reason,
-        reference: reference
+        description: reason,
+        reference_id: reference&.id,
+        reference_type: reference&.class&.name
       )
     end
     true
@@ -100,10 +131,12 @@ class User < ApplicationRecord
     transaction do
       update!(coin_balance: coin_balance - amount)
       coin_transactions.create!(
-        amount: -amount,
+        amount: amount,
+        balance_after: coin_balance,
         transaction_type: 'debit',
-        reason: reason,
-        reference: reference
+        description: reason,
+        reference_id: reference&.id,
+        reference_type: reference&.class&.name
       )
     end
     true

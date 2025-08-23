@@ -1,5 +1,5 @@
 class Api::V1::VideoChatController < ApplicationController
-  before_action :authenticate_user!
+  # before_action :authenticate_user!
 
   # POST /api/video_chat/join
   # User joins the video chat queue

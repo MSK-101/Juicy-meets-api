@@ -10,3 +10,6 @@ class AddOnlineStatusToUsers < ActiveRecord::Migration[7.2]
     add_index :users, :last_activity_at
   end
 end
+
+
+

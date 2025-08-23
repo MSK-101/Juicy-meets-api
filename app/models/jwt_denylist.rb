@@ -1,3 +1,3 @@
-class JwtDenylist < ApplicationRecord
-  include Devise::JWT::RevocationStrategies::Denylist
-end
+# class JwtDenylist < ApplicationRecord
+#   include Devise::JWT::RevocationStrategies::Denylist
+# end

@@ -194,6 +194,15 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
     t.index ["user_id"], name: "index_staff_assignments_on_user_id"
   end
 
+  create_table "user_ip_addresses", force: :cascade do |t|
+    t.bigint "user_id", null: false
+    t.string "ip_address", null: false
+    t.datetime "created_at", null: false
+    t.index ["ip_address"], name: "index_user_ip_addresses_on_ip_address"
+    t.index ["user_id", "ip_address"], name: "index_user_ip_addresses_on_user_id_and_ip_address", unique: true
+    t.index ["user_id"], name: "index_user_ip_addresses_on_user_id"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
@@ -215,7 +224,6 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
     t.integer "coin_balance", default: 0, null: false
     t.boolean "is_guest", default: false, null: false
     t.string "guest_token"
-    t.string "ip_address"
     t.text "user_agent"
     t.jsonb "preferences", default: {}
     t.datetime "last_visit_at"
@@ -224,11 +232,11 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
     t.integer "total_online_time", default: 0
     t.integer "role", default: 0, null: false
     t.integer "status", default: 0, null: false
+    t.integer "user_status", default: 0, null: false
     t.index ["coin_balance"], name: "index_users_on_coin_balance"
     t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["guest_token"], name: "index_users_on_guest_token", unique: true
-    t.index ["ip_address"], name: "index_users_on_ip_address"
     t.index ["is_guest"], name: "index_users_on_is_guest"
     t.index ["last_activity_at"], name: "index_users_on_last_activity_at"
     t.index ["preferences"], name: "index_users_on_preferences", using: :gin
@@ -236,6 +244,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["role"], name: "index_users_on_role"
     t.index ["status"], name: "index_users_on_status"
+    t.index ["user_status"], name: "index_users_on_user_status"
   end
 
   create_table "video_chat_connections", force: :cascade do |t|
@@ -351,6 +360,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
   add_foreign_key "staff_assignments", "pools"
   add_foreign_key "staff_assignments", "sequences"
   add_foreign_key "staff_assignments", "users"
+  add_foreign_key "user_ip_addresses", "users"
   add_foreign_key "video_chat_connections", "users", column: "initiator_id"
   add_foreign_key "video_chat_connections", "users", column: "recipient_id"
   add_foreign_key "video_chat_connections", "video_chat_sessions"

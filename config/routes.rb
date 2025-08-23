@@ -21,7 +21,8 @@ Rails.application.routes.draw do
       # User management - RESTful
       resources :users, only: [:create, :show] do
         collection do
-          get :me  # /api/v1/users/me -> users#show
+          get :me  # /api/v1/users/me
+          post :validate_token  # /api/v1/users/validate_token
         end
       end
 

@@ -19,3 +19,6 @@ class CreateStaffAssignments < ActiveRecord::Migration[7.2]
     add_index :staff_assignments, [:last_online_at]
   end
 end
+
+
+

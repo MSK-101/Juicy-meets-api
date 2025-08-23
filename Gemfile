@@ -35,7 +35,8 @@ gem "kaminari"
 
 # Authentication
 gem "devise"
-gem "devise-jwt"
+# gem "devise-jwt"  # Removed due to compatibility issues
+gem "jwt"  # For manual JWT token generation
 
 # Serialization
 gem "blueprinter"

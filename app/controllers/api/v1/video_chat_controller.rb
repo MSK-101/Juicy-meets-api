@@ -1,13 +1,13 @@
 class Api::V1::VideoChatController < ApplicationController
-  # Skip authentication for now - using random user IDs
-  # before_action :authenticate_user!
+  # Require authentication for video chat
+  # before_action :authenticate_user! # Commented out - using JWT authentication from concern
 
   # Using PubNub for signaling - no server-side signal storage needed
 
   # POST /api/video_chat/join
   # User joins the video chat queue
   def join
-    user_id = get_or_create_user_id
+    user_id = current_user.id
 
     # Find or create a waiting room entry
     waiting_entry = VideoWaitingRoom.find_by(user_id: user_id)
@@ -37,7 +37,7 @@ class Api::V1::VideoChatController < ApplicationController
   # GET /api/video_chat/status
   # Check if user has been matched
   def status
-    user_id = get_or_create_user_id
+    user_id = current_user.id
     waiting_entry = VideoWaitingRoom.find_by(user_id: user_id)
 
     unless waiting_entry
@@ -67,7 +67,7 @@ class Api::V1::VideoChatController < ApplicationController
   # POST /api/video_chat/leave
   # User leaves the video chat
   def leave
-    user_id = get_or_create_user_id
+    user_id = current_user.id
     waiting_entry = VideoWaitingRoom.find_by(user_id: user_id)
 
     if waiting_entry
@@ -95,18 +95,6 @@ class Api::V1::VideoChatController < ApplicationController
   end
 
   private
-
-  def get_or_create_user_id
-    # Try to get user ID from header first, then session, then create new
-    user_id = request.headers['X-User-ID'] || session[:user_id]
-
-    unless user_id
-      user_id = "user_#{Time.current.to_i}_#{SecureRandom.hex(4)}"
-      session[:user_id] = user_id
-    end
-
-    user_id
-  end
 
   def match_users(current_user_id)
     # Find another waiting user (not current user)
