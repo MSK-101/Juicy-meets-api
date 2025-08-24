@@ -24,6 +24,8 @@ class User < ApplicationRecord
   # Enums
   enum role: { user: 0, staff: 1}
   enum status: { offline: 0, online: 1, in_chat: 2, busy: 3 }
+  enum gender: { male: 0, female: 1, other: 2 }, _prefix: :gender
+  enum interested_in: { male: 0, female: 1, other: 2 }, _prefix: :interested_in
   enum user_status: { pending: 0, active: 1, suspended: 2 }
 
   # Scopes
@@ -96,6 +98,10 @@ class User < ApplicationRecord
       #it means he has no coins
       Pool.find_by(name: 'Pool C')
     end
+  end
+
+  def next_sequence(curr_pos)
+    pool.sequences.active.find_by(position: curr_pos + 1) || pool.sequences.active.ordered.first
   end
 
   # Send forgot password email with new password
