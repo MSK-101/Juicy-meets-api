@@ -40,6 +40,43 @@ end
 
 puts "Created #{CoinPackage.count} coin packages"
 
+# Create sample deduction rules for testing
+puts "Creating deduction rules..."
+deduction_rules = [
+  {
+    name: "10 Second Rule",
+    threshold_seconds: 10,
+    coins: 5,
+    active: true
+  },
+  {
+    name: "30 Second Rule",
+    threshold_seconds: 30,
+    coins: 10,
+    active: true
+  },
+  {
+    name: "1 Minute Rule",
+    threshold_seconds: 60,
+    coins: 15,
+    active: true
+  },
+  {
+    name: "2 Minute Rule",
+    threshold_seconds: 120,
+    coins: 25,
+    active: true
+  }
+]
+
+deduction_rules.each do |rule_data|
+  DeductionRule.find_or_create_by(threshold_seconds: rule_data[:threshold_seconds]) do |rule|
+    rule.assign_attributes(rule_data)
+  end
+end
+
+puts "Created #{DeductionRule.count} deduction rules"
+
 # Create test user for development
 if Rails.env.development?
   test_user = User.find_or_create_by(email: 'test@example.com') do |user|

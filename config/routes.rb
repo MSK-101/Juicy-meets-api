@@ -58,6 +58,9 @@ Rails.application.routes.draw do
         post :join           # Join video chat queue
         get :status          # Check match status
         post :leave          # Leave chat
+        get :deduction_rules # Get active deduction rules
+        post :apply_duration_deduction # Apply duration-based deductions
+        get :user_balance    # Get user's current coin balance
         # Note: WebRTC signaling handled by PubNub on frontend
       end
 
