@@ -58,6 +58,8 @@ Rails.application.routes.draw do
         post :join           # Join video chat queue
         get :status          # Check match status
         post :leave          # Leave chat
+        post :swipe          # Swipe to next match
+        post :end_session    # End current session
         get :deduction_rules # Get active deduction rules
         post :apply_duration_deduction # Apply duration-based deductions
         get :user_balance    # Get user's current coin balance
@@ -78,6 +80,20 @@ Rails.application.routes.draw do
         collection do
           get :filters
         end
+        member do
+          get :public, action: :show_public
+          get :stream, action: :stream_video
+          match :stream, via: [:options], action: :stream_video_options
+        end
+      end
+
+      # Analytics routes
+      namespace :analytics do
+        get :overview
+        get 'staff_performance/:staff_id', action: :staff_performance
+        get 'video_performance/:video_id', action: :video_performance
+        get 'pool_analytics/:pool_id', action: :pool_analytics
+        get 'user_journey/:user_id', action: :user_journey
       end
 
       # Video chat routes (removed - using PubNub for real-time communication)

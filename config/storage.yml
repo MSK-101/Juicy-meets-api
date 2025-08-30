@@ -6,6 +6,15 @@ local:
   service: Disk
   root: <%= Rails.root.join("storage") %>
 
+cloudinary:
+  service: Cloudinary
+  cloud_name: <%= ENV.fetch("CLOUDINARY_CLOUD_NAME") { "dytgmz9ry" } %>
+  api_key: <%= ENV.fetch("CLOUDINARY_API_KEY") { "936396848818423" } %>
+  api_secret: <%= ENV.fetch("CLOUDINARY_API_SECRET") { "RN3a217o2qj5uqouUEUoyoNblTQ" } %>
+  secure: true
+  # Additional Cloudinary options for better performance
+  folder: <%= ENV.fetch("CLOUDINARY_FOLDER", "seed_programming") %>
+
 # Use bin/rails credentials:edit to set the AWS secrets (as aws:access_key_id|secret_access_key)
 # amazon:
 #   service: S3

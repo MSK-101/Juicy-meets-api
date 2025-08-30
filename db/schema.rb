@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
+ActiveRecord::Schema[7.2].define(version: 2025_08_30_152937) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -49,20 +49,6 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.index ["email"], name: "index_admins_on_email", unique: true
-  end
-
-  create_table "chat_messages", force: :cascade do |t|
-    t.text "message", null: false
-    t.bigint "video_chat_connection_id", null: false
-    t.bigint "user_id", null: false
-    t.boolean "is_system_message", default: false
-    t.string "message_type", default: "text"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["created_at"], name: "index_chat_messages_on_created_at"
-    t.index ["is_system_message"], name: "index_chat_messages_on_is_system_message"
-    t.index ["user_id"], name: "index_chat_messages_on_user_id"
-    t.index ["video_chat_connection_id"], name: "index_chat_messages_on_video_chat_connection_id"
   end
 
   create_table "coin_packages", force: :cascade do |t|
@@ -105,22 +91,6 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
     t.index ["threshold_seconds"], name: "index_deduction_rules_on_threshold_seconds", unique: true
   end
 
-  create_table "ice_candidates", force: :cascade do |t|
-    t.text "candidate", null: false
-    t.bigint "video_chat_connection_id", null: false
-    t.bigint "user_id", null: false
-    t.string "candidate_type"
-    t.integer "priority"
-    t.string "transport"
-    t.string "connection_address"
-    t.integer "port"
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["candidate_type"], name: "index_ice_candidates_on_candidate_type"
-    t.index ["user_id"], name: "index_ice_candidates_on_user_id"
-    t.index ["video_chat_connection_id"], name: "index_ice_candidates_on_video_chat_connection_id"
-  end
-
   create_table "jwt_denylists", force: :cascade do |t|
     t.string "jti"
     t.datetime "exp"
@@ -134,13 +104,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
     t.boolean "active", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.integer "tier", default: 0, null: false
-    t.text "description"
-    t.jsonb "features", default: {}
-    t.integer "min_coin_threshold", default: 0, null: false
     t.index ["active"], name: "index_pools_on_active"
-    t.index ["min_coin_threshold"], name: "index_pools_on_min_coin_threshold"
-    t.index ["tier"], name: "index_pools_on_tier"
   end
 
   create_table "purchases", force: :cascade do |t|
@@ -168,7 +132,9 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "name"
+    t.text "content_type", default: [], array: true
     t.index ["active"], name: "index_sequences_on_active"
+    t.index ["content_type"], name: "index_sequences_on_content_type", using: :gin
     t.index ["pool_id", "position"], name: "index_sequences_on_pool_id_and_position"
     t.index ["pool_id"], name: "index_sequences_on_pool_id"
     t.index ["position"], name: "index_sequences_on_position"
@@ -222,12 +188,6 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
     t.string "provider"
     t.string "uid"
     t.integer "coin_balance", default: 0, null: false
-    t.boolean "is_guest", default: false, null: false
-    t.string "guest_token"
-    t.text "user_agent"
-    t.jsonb "preferences", default: {}
-    t.datetime "last_visit_at"
-    t.integer "visit_count", default: 0, null: false
     t.datetime "last_activity_at"
     t.integer "total_online_time", default: 0
     t.integer "role", default: 0, null: false
@@ -236,10 +196,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
     t.index ["coin_balance"], name: "index_users_on_coin_balance"
     t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["email"], name: "index_users_on_email", unique: true
-    t.index ["guest_token"], name: "index_users_on_guest_token", unique: true
-    t.index ["is_guest"], name: "index_users_on_is_guest"
     t.index ["last_activity_at"], name: "index_users_on_last_activity_at"
-    t.index ["preferences"], name: "index_users_on_preferences", using: :gin
     t.index ["provider", "uid"], name: "index_users_on_provider_and_uid", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["role"], name: "index_users_on_role"
@@ -247,68 +204,37 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
     t.index ["user_status"], name: "index_users_on_user_status"
   end
 
-  create_table "video_chat_connections", force: :cascade do |t|
-    t.bigint "video_chat_session_id", null: false
-    t.bigint "initiator_id", null: false
-    t.bigint "recipient_id"
-    t.bigint "video_id"
-    t.integer "connection_type", default: 0, null: false
-    t.integer "status", default: 0, null: false
-    t.integer "coins_deducted", default: 0, null: false
-    t.integer "duration_seconds", default: 0, null: false
-    t.datetime "started_at"
-    t.datetime "ended_at"
-    t.jsonb "metadata", default: {}
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.text "offer_sdp"
-    t.text "answer_sdp"
-    t.index ["connection_type", "status"], name: "index_video_chat_connections_on_connection_type_and_status"
-    t.index ["created_at"], name: "index_video_chat_connections_on_created_at"
-    t.index ["initiator_id", "status"], name: "index_video_chat_connections_on_initiator_id_and_status"
-    t.index ["initiator_id"], name: "index_video_chat_connections_on_initiator_id"
-    t.index ["recipient_id"], name: "index_video_chat_connections_on_recipient_id"
-    t.index ["video_chat_session_id", "status"], name: "idx_on_video_chat_session_id_status_6360f0504c"
-    t.index ["video_chat_session_id"], name: "index_video_chat_connections_on_video_chat_session_id"
-    t.index ["video_id"], name: "index_video_chat_connections_on_video_id"
-  end
-
   create_table "video_chat_sessions", force: :cascade do |t|
-    t.bigint "user_id", null: false
-    t.integer "current_position", default: 1, null: false
-    t.integer "status", default: 0, null: false
-    t.datetime "started_at"
+    t.string "session_id", null: false
+    t.bigint "user_id"
+    t.bigint "partner_user_id"
+    t.bigint "staff_user_id"
+    t.bigint "video_id"
+    t.bigint "pool_id"
+    t.bigint "sequence_id"
+    t.string "session_type", null: false
+    t.string "status", default: "active", null: false
+    t.integer "duration_seconds"
+    t.datetime "started_at", null: false
     t.datetime "ended_at"
-    t.jsonb "metadata", default: {}
+    t.string "room_id"
+    t.text "notes"
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.index ["user_id", "created_at"], name: "index_video_chat_sessions_on_user_id_and_created_at"
+    t.index ["partner_user_id"], name: "index_video_chat_sessions_on_partner_user_id"
+    t.index ["pool_id", "status"], name: "index_video_chat_sessions_on_pool_id_and_status"
+    t.index ["pool_id"], name: "index_video_chat_sessions_on_pool_id"
+    t.index ["room_id"], name: "index_video_chat_sessions_on_room_id"
+    t.index ["sequence_id", "status"], name: "index_video_chat_sessions_on_sequence_id_and_status"
+    t.index ["sequence_id"], name: "index_video_chat_sessions_on_sequence_id"
+    t.index ["session_id"], name: "index_video_chat_sessions_on_session_id", unique: true
+    t.index ["staff_user_id", "status"], name: "index_video_chat_sessions_on_staff_user_id_and_status"
+    t.index ["staff_user_id"], name: "index_video_chat_sessions_on_staff_user_id"
+    t.index ["started_at"], name: "index_video_chat_sessions_on_started_at"
     t.index ["user_id", "status"], name: "index_video_chat_sessions_on_user_id_and_status"
     t.index ["user_id"], name: "index_video_chat_sessions_on_user_id"
-  end
-
-  create_table "video_views", force: :cascade do |t|
-    t.bigint "video_chat_session_id", null: false
-    t.bigint "user_id", null: false
-    t.bigint "video_id", null: false
-    t.bigint "video_chat_connection_id"
-    t.integer "view_type", default: 0, null: false
-    t.integer "status", default: 0, null: false
-    t.integer "duration_seconds", default: 0, null: false
-    t.datetime "started_at"
-    t.datetime "ended_at"
-    t.jsonb "metadata", default: {}
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
-    t.index ["created_at"], name: "index_video_views_on_created_at"
-    t.index ["user_id", "status"], name: "index_video_views_on_user_id_and_status"
-    t.index ["user_id"], name: "index_video_views_on_user_id"
-    t.index ["video_chat_connection_id"], name: "index_video_views_on_video_chat_connection_id"
-    t.index ["video_chat_session_id", "status"], name: "index_video_views_on_video_chat_session_id_and_status"
-    t.index ["video_chat_session_id"], name: "index_video_views_on_video_chat_session_id"
-    t.index ["video_id", "status"], name: "index_video_views_on_video_id_and_status"
-    t.index ["video_id"], name: "index_video_views_on_video_id"
-    t.index ["view_type", "status"], name: "index_video_views_on_view_type_and_status"
+    t.index ["video_id", "status"], name: "index_video_chat_sessions_on_video_id_and_status"
+    t.index ["video_id"], name: "index_video_chat_sessions_on_video_id"
   end
 
   create_table "video_waiting_rooms", force: :cascade do |t|
@@ -320,13 +246,17 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
     t.datetime "joined_at", null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
-    t.string "match_type", default: "real_user"
+    t.bigint "pool_id"
+    t.bigint "sequence_id"
+    t.string "match_type", default: "real_user", null: false
     t.bigint "video_id"
-    t.index ["match_type"], name: "index_video_waiting_rooms_on_match_type"
+    t.index ["pool_id", "status"], name: "index_video_waiting_rooms_on_pool_id_and_status"
+    t.index ["pool_id"], name: "index_video_waiting_rooms_on_pool_id"
     t.index ["room_id"], name: "index_video_waiting_rooms_on_room_id"
+    t.index ["sequence_id", "status"], name: "index_video_waiting_rooms_on_sequence_id_and_status"
+    t.index ["sequence_id"], name: "index_video_waiting_rooms_on_sequence_id"
     t.index ["status"], name: "index_video_waiting_rooms_on_status"
     t.index ["user_id"], name: "index_video_waiting_rooms_on_user_id", unique: true
-    t.index ["video_id"], name: "index_video_waiting_rooms_on_video_id"
   end
 
   create_table "videos", force: :cascade do |t|
@@ -349,11 +279,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
 
   add_foreign_key "active_storage_attachments", "active_storage_blobs", column: "blob_id"
   add_foreign_key "active_storage_variant_records", "active_storage_blobs", column: "blob_id"
-  add_foreign_key "chat_messages", "users"
-  add_foreign_key "chat_messages", "video_chat_connections"
   add_foreign_key "coin_transactions", "users"
-  add_foreign_key "ice_candidates", "users"
-  add_foreign_key "ice_candidates", "video_chat_connections"
   add_foreign_key "purchases", "coin_packages"
   add_foreign_key "purchases", "users"
   add_foreign_key "sequences", "pools"
@@ -361,15 +287,14 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_17_203812) do
   add_foreign_key "staff_assignments", "sequences"
   add_foreign_key "staff_assignments", "users"
   add_foreign_key "user_ip_addresses", "users"
-  add_foreign_key "video_chat_connections", "users", column: "initiator_id"
-  add_foreign_key "video_chat_connections", "users", column: "recipient_id"
-  add_foreign_key "video_chat_connections", "video_chat_sessions"
-  add_foreign_key "video_chat_connections", "videos"
+  add_foreign_key "video_chat_sessions", "pools"
+  add_foreign_key "video_chat_sessions", "sequences"
   add_foreign_key "video_chat_sessions", "users"
-  add_foreign_key "video_views", "users"
-  add_foreign_key "video_views", "video_chat_connections"
-  add_foreign_key "video_views", "video_chat_sessions"
-  add_foreign_key "video_views", "videos"
+  add_foreign_key "video_chat_sessions", "users", column: "partner_user_id"
+  add_foreign_key "video_chat_sessions", "users", column: "staff_user_id"
+  add_foreign_key "video_chat_sessions", "videos"
+  add_foreign_key "video_waiting_rooms", "pools"
+  add_foreign_key "video_waiting_rooms", "sequences"
   add_foreign_key "videos", "admins"
   add_foreign_key "videos", "pools"
   add_foreign_key "videos", "sequences"

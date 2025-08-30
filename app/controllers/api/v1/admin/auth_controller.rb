@@ -1,7 +1,7 @@
-class Api::V1::Admin::AuthController < ApplicationController
+class Api::V1::Admin::AuthController < Api::V1::Admin::BaseController
+  # Only include AdminAuthenticatable for actions that need admin authentication
+  before_action :authenticate_admin!, only: [:me]
   include AdminAuthenticatable
-  skip_before_action :authenticate_user!, only: [:login, :logout]
-  skip_before_action :authenticate_admin!, only: [:login, :logout]
 
   # POST /api/v1/admin/auth/login
   def login

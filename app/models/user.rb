@@ -1,11 +1,9 @@
 class User < ApplicationRecord
   devise :database_authenticatable, :registerable,
-         :recoverable, :rememberable, :validatable,
-         :confirmable, :omniauthable,
-         omniauth_providers: [:google_oauth2]
-
-  # Basic JWT configuration - temporarily disabled
-  # :jwt_authenticatable
+        :recoverable, :rememberable, :validatable,
+        :jwt_authenticatable, jwt_revocation_strategy: Devise::JWT::RevocationStrategies::Null
+        #  :confirmable, :omniauthable,
+        #  omniauth_providers: [:google_oauth2]
 
   # Associations
   has_many :purchases, dependent: :destroy
@@ -88,10 +86,14 @@ class User < ApplicationRecord
   end
 
   def pool
-    if coin_balance > 0 && coin_transactions.empty?
+    if staff_assignment.present?
+      return staff_assignment.pool
+    end
+
+    if coin_balance > 0 && purchases.blank?
       #it means he has free coins
       Pool.find_by(name: 'Pool A')
-    elsif coin_balance > 0 && coin_transactions.any?
+    elsif coin_balance > 0
       #it means he has paid coins
       Pool.find_by(name: 'Pool B')
     else

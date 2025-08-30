@@ -1,6 +1,6 @@
-class Api::V1::Admin::DeductionRulesController < ApplicationController
+class Api::V1::Admin::DeductionRulesController < Api::V1::Admin::BaseController
   include AdminAuthenticatable
-  skip_before_action :authenticate_user!
+  before_action :authenticate_admin!
 
   before_action :set_rule, only: [:show, :update, :destroy]
 

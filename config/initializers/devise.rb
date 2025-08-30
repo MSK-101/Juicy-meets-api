@@ -269,16 +269,15 @@ Devise.setup do |config|
   # The "*/*" below is required to match Internet Explorer requests.
   config.navigational_formats = []
 
-  # JWT Configuration - Simplified for devise-jwt 0.12.1
-  # Temporarily commented out to resolve startup issues
-  # config.jwt do |jwt|
-  #   jwt.secret = Rails.application.secret_key_base
-  #   jwt.dispatch_requests = [
-  #     ['POST', %r{^/api/v1/login$}],
-  #     ['POST', %r{^/api/v1/users$}]
-  #   ]
-  #   jwt.expiration_time = 1.day.to_i
-  # end
+  # JWT Configuration for devise-jwt
+  config.jwt do |jwt|
+    jwt.secret = Rails.application.secret_key_base
+    jwt.dispatch_requests = [
+      ['POST', %r{^/api/v1/login$}],
+      ['POST', %r{^/api/v1/users$}]
+    ]
+    jwt.expiration_time = 1.day.to_i
+  end
 
   # ==> Warden configuration
   # If you want to use other strategies, that are not supported by Devise, or

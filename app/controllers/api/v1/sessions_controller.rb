@@ -6,8 +6,10 @@ class Api::V1::SessionsController < ApplicationController
     user = User.find_by(email: session_params[:email])
 
     if user && user.valid_password?(session_params[:password])
-      # Use warden directly to avoid session issues
-      warden.set_user(user, store: false)
+      # Sign in the user with Devise JWT
+      sign_in(user)
+
+      # Get the JWT token from the request headers after sign_in
       token = request.env['warden-jwt_auth.token']
 
       render json: {
@@ -15,7 +17,8 @@ class Api::V1::SessionsController < ApplicationController
         message: 'Successfully signed in',
         data: {
           user: user_response(user),
-          token: token
+          token: token,
+          coin_balance: user.coin_balance
         }
       }
     else

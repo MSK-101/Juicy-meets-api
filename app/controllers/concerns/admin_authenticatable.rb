@@ -1,9 +1,7 @@
 module AdminAuthenticatable
   extend ActiveSupport::Concern
 
-  included do
-    before_action :authenticate_admin!
-  end
+  # Removed automatic before_action - controllers should add it manually where needed
 
   private
 
@@ -11,7 +9,7 @@ module AdminAuthenticatable
     token = extract_token_from_header
     Rails.logger.info "Admin auth: Token extracted: #{token ? 'present' : 'missing'}"
     Rails.logger.info "Admin auth: Authorization header: #{request.headers['Authorization']}"
-    return render_unauthorized unless token
+    return render_admin_unauthorized unless token
 
     begin
       decoded_token = JWT.decode(token, Rails.application.secret_key_base, true, { algorithm: 'HS256' })
@@ -22,10 +20,10 @@ module AdminAuthenticatable
       Rails.logger.info "Admin auth: Admin found: #{@current_admin.email}"
     rescue JWT::DecodeError => e
       Rails.logger.error "Admin auth: JWT decode error: #{e.message}"
-      render_unauthorized
+      render_admin_unauthorized
     rescue ActiveRecord::RecordNotFound => e
       Rails.logger.error "Admin auth: Admin not found: #{e.message}"
-      render_unauthorized
+      render_admin_unauthorized
     end
   end
 
@@ -40,7 +38,7 @@ module AdminAuthenticatable
     auth_header.split(' ').last
   end
 
-  def render_unauthorized
+  def render_admin_unauthorized
     render json: {
       success: false,
       message: 'Unauthorized access',

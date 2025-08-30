@@ -1,6 +1,6 @@
-class Api::V1::Admin::StaffController < ApplicationController
-  skip_before_action :authenticate_user!
+class Api::V1::Admin::StaffController < Api::V1::Admin::BaseController
   include AdminAuthenticatable
+  before_action :authenticate_admin!
 
   # GET /api/v1/staff
   def index

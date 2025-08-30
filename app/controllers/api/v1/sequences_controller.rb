@@ -1,6 +1,6 @@
-class Api::V1::SequencesController < ApplicationController
-  skip_before_action :authenticate_user!
+class Api::V1::SequencesController < Api::V1::Admin::BaseController
   include AdminAuthenticatable
+  before_action :authenticate_admin!
   before_action :set_pool
   before_action :set_sequence, only: [:show, :update, :destroy]
 
@@ -15,7 +15,8 @@ class Api::V1::SequencesController < ApplicationController
           active: sequence.active,
           position: sequence.position,
           pool_id: sequence.pool_id,
-          videos_count: sequence.videos.count
+          videos_count: sequence.videos.count,
+          content_type: sequence.content_type || []
         }
       end
     }
@@ -30,6 +31,7 @@ class Api::V1::SequencesController < ApplicationController
         active: @sequence.active,
         position: @sequence.position,
         pool_id: @sequence.pool_id,
+        content_type: @sequence.content_type || [],
         videos: @sequence.videos.map do |video|
           {
             id: video.id,
@@ -54,7 +56,8 @@ class Api::V1::SequencesController < ApplicationController
           video_count: @sequence.video_count,
           active: @sequence.active,
           position: @sequence.position,
-          pool_id: @sequence.pool_id
+          pool_id: @sequence.pool_id,
+          content_type: @sequence.content_type || []
         }
       }, status: :created
     else
@@ -71,7 +74,8 @@ class Api::V1::SequencesController < ApplicationController
           video_count: @sequence.video_count,
           active: @sequence.active,
           position: @sequence.position,
-          pool_id: @sequence.pool_id
+          pool_id: @sequence.pool_id,
+          content_type: @sequence.content_type || []
         }
       }
     else
@@ -109,6 +113,6 @@ class Api::V1::SequencesController < ApplicationController
   end
 
   def sequence_params
-    params.require(:sequence).permit(:name, :video_count, :active)
+    params.require(:sequence).permit(:name, :video_count, :active, :pool_id, content_type: [])
   end
 end

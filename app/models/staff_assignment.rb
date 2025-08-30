@@ -19,6 +19,7 @@ class StaffAssignment < ApplicationRecord
   scope :active, -> { where(status: 'active') }
   scope :by_pool, ->(pool_id) { where(pool_id: pool_id) }
   scope :by_gender, ->(gender) { where(assigned_gender: gender) }
+  scope :by_sequence, ->(sequence_id) { where(sequence_id: sequence_id) }
   scope :online, -> { joins(:user).where(users: { status: [:online, :in_chat] }) }
 
   # Callbacks

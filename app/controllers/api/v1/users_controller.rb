@@ -1,14 +1,16 @@
 class Api::V1::UsersController < ApplicationController
-  skip_before_action :authenticate_user_from_jwt!, only: [:create, :validate_token]
+  skip_before_action :authenticate_user!, only: [:create, :validate_token]
 
   # POST /api/v1/users
   def create
     # Check if user already exists with this email
     existing_user = User.find_by(email: user_params[:email])
-
     if existing_user.present?
       # User already exists, log them in automatically
-      token = generate_jwt_token(existing_user)
+      sign_in(existing_user)
+
+      # Get the JWT token from the request headers after sign_in
+      token = request.env['warden-jwt_auth.token']
 
       render json: {
         success: true,
@@ -38,7 +40,11 @@ class Api::V1::UsersController < ApplicationController
       ip_result = user.give_free_coins_and_track_ip!(request.remote_ip)
 
       # Generate JWT token for the new user
-      token = generate_jwt_token(user)
+      sign_in(user)
+
+      # Get the JWT token from the request headers after sign_in
+      token = request.env['warden-jwt_auth.token']
+
 
       render json: {
         success: true,
@@ -79,17 +85,27 @@ class Api::V1::UsersController < ApplicationController
       return
     end
 
+    # Use Devise JWT to validate the token
     begin
-      decoded_token = JWT.decode(token, Rails.application.secret_key_base, true, { algorithm: 'HS256' })
-      user_id = decoded_token.first['user_id']
-      user = User.find(user_id)
+      # Set the token in the request headers for Devise to process
+      request.headers['Authorization'] = "Bearer #{token}"
 
-      render json: {
-        valid: true,
-        user: user_response(user),
-        message: 'Token is valid'
-      }
-    rescue JWT::DecodeError, JWT::ExpiredSignature, ActiveRecord::RecordNotFound => e
+      # Try to authenticate the user with the token
+      user = warden.authenticate(scope: :user)
+
+      if user
+        render json: {
+          valid: true,
+          user: user_response(user),
+          message: 'Token is valid'
+        }
+      else
+        render json: {
+          valid: false,
+          message: 'Invalid token'
+        }, status: :unauthorized
+      end
+    rescue => e
       render json: {
         valid: false,
         message: 'Invalid or expired token',
@@ -122,17 +138,6 @@ class Api::V1::UsersController < ApplicationController
       created_at: user.created_at,
       updated_at: user.updated_at
     }
-  end
-
-  def generate_jwt_token(user)
-    payload = {
-      user_id: user.id,
-      email: user.email,
-      exp: 24.hours.from_now.to_i,
-      iat: Time.current.to_i
-    }
-
-    JWT.encode(payload, Rails.application.secret_key_base, 'HS256')
   end
 
   def warden

@@ -32,10 +32,11 @@ gem "rack-cors"
 
 # Pagination
 gem "kaminari"
+gem "cloudinary"
 
 # Authentication
 gem "devise"
-# gem "devise-jwt"  # Removed due to compatibility issues
+gem "devise-jwt"
 gem "jwt"  # For manual JWT token generation
 
 # Serialization

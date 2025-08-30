@@ -1,6 +1,6 @@
-class Api::V1::PoolsController < ApplicationController
-  skip_before_action :authenticate_user!
+class Api::V1::PoolsController < Api::V1::Admin::BaseController
   include AdminAuthenticatable
+  before_action :authenticate_admin!
   before_action :set_pool, only: [:show, :update, :destroy]
 
   def index
@@ -31,7 +31,8 @@ class Api::V1::PoolsController < ApplicationController
             video_count: sequence.video_count,
             active: sequence.active,
             position: sequence.position,
-            videos_count: sequence.videos.count
+            videos_count: sequence.videos.count,
+            content_type: sequence.content_type || []
           }
         end
       }

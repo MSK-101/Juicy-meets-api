@@ -1,7 +1,7 @@
-class Api::V1::VideosController < ApplicationController
-  skip_before_action :authenticate_user!
+class Api::V1::VideosController < Api::V1::Admin::BaseController
   include AdminAuthenticatable
-  before_action :set_video, only: [:show, :update, :destroy]
+  before_action :authenticate_admin!, except: [:show_public, :stream_video]
+  before_action :set_video, only: [:show, :update, :destroy, :show_public, :stream_video]
 
   # GET /api/v1/videos
   def index
@@ -31,7 +31,7 @@ class Api::V1::VideosController < ApplicationController
     }
   end
 
-  # GET /api/v1/videos/:id
+  # GET /api/v1/videos/:id (Admin only)
   def show
     render json: {
       success: true,
@@ -39,6 +39,59 @@ class Api::V1::VideosController < ApplicationController
         video: video_response(@video)
       }
     }
+  end
+
+  # GET /api/v1/videos/:id/public (Public access for video chat)
+  def show_public
+    render json: {
+      success: true,
+      data: {
+        video: {
+          id: @video.id,
+          name: @video.name,
+          gender: @video.gender,
+          status: @video.status,
+          video_file_url: @video.video_file.attached? ? @video.video_file.url : nil
+        }
+      }
+    }
+  end
+
+    # GET /api/v1/videos/:id/stream (Stream video with CORS headers)
+  def stream_video
+    unless @video.video_file.attached?
+      render json: { error: 'Video file not found' }, status: :not_found
+      return
+    end
+
+    # Set CORS headers
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    response.headers['Content-Type'] = @video.video_file.content_type
+
+    # Stream the video content directly
+    response.headers['Content-Length'] = @video.video_file.byte_size
+    response.headers['Accept-Ranges'] = 'bytes'
+
+    # Stream the video in chunks
+    @video.video_file.open do |file|
+      while (chunk = file.read(8192))
+        response.stream.write(chunk)
+      end
+    ensure
+      response.stream.close
+    end
+  end
+
+  # OPTIONS /api/v1/videos/:id/stream (Handle CORS preflight)
+  def stream_video_options
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Access-Control-Allow-Methods'] = 'GET, OPTIONS'
+    response.headers['Access-Control-Allow-Headers'] = 'Content-Type'
+    response.headers['Access-Control-Max-Age'] = '86400'
+
+    head :ok
   end
 
   # POST /api/v1/videos
@@ -127,14 +180,15 @@ class Api::V1::VideosController < ApplicationController
         id: video.sequence.id,
         name: video.sequence.name || "Sequence #{video.sequence.position}",
         position: video.sequence.position,
-        video_count: video.sequence.video_count
+        video_count: video.sequence.video_count,
+        content_type: video.sequence.content_type || []
       },
       admin: {
         id: video.admin.id,
         email: video.admin.email,
         display_name: video.admin.display_name
       },
-      video_file_url: video.video_file.attached? ? rails_blob_url(video.video_file) : nil,
+      video_file_url: video.video_file.attached? ? video.video_file.url : nil,
       created_at: video.created_at,
       updated_at: video.updated_at
     }
