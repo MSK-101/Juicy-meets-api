@@ -27,7 +27,7 @@ class Api::V1::PoolsController < Api::V1::Admin::BaseController
         sequences: @pool.sequences.ordered.map do |sequence|
           {
             id: sequence.id,
-            name: "Sequence #{sequence.position}",
+            name: sequence.name,
             video_count: sequence.video_count,
             active: sequence.active,
             position: sequence.position,

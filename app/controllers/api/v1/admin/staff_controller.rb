@@ -18,6 +18,7 @@ class Api::V1::Admin::StaffController < Api::V1::Admin::BaseController
           totalActivityTime: format_activity_time(user.total_online_time || 0),
           period: "Today",
           status: user.status,
+          assigned_gender: user.gender,
           gender: user.gender,
           assignmentStatus: user.staff_assignment&.status || 'inactive',
           regDate: user.created_at.strftime("%m/%d/%Y"),
@@ -59,6 +60,7 @@ class Api::V1::Admin::StaffController < Api::V1::Admin::BaseController
     @user.role = :staff
     @user.password = User.generate_random_password
     @user.confirmed_at = Time.current
+    @user.profile_completed = true # Staff profiles are completed by default
 
     if @user.save
       # Create staff assignment
@@ -71,7 +73,9 @@ class Api::V1::Admin::StaffController < Api::V1::Admin::BaseController
           staff: {
             id: @user.id,
             email: @user.email,
-            role: @user.role
+            role: @user.role,
+            pool_id: @staff_assignment.pool_id,
+            sequence_id: @staff_assignment.sequence_id
           }
         }, status: :created
       else

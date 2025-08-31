@@ -26,7 +26,7 @@ class Api::V1::VideoChatController < ApplicationController
     user = User.find(user_id)
     pool = user.pool
     sequence = user.pool&.sequences&.active&.ordered&.first
-
+    match_type = user.role == 'staff' ? 'staff' : 'real_user'
     # Create new waiting room entry with pool and sequence info
     waiting_entry = VideoWaitingRoom.create!(
       user_id: user_id,
@@ -34,7 +34,7 @@ class Api::V1::VideoChatController < ApplicationController
       sequence_id: sequence&.id,
       joined_at: Time.current,
       status: 'waiting',
-      match_type: 'real_user'
+      match_type: match_type
     )
 
     # Try to find a match using the pool matching service
@@ -49,12 +49,14 @@ class Api::V1::VideoChatController < ApplicationController
         status: 'matched',
         room_id: match_result[:room_id],
         match_type: match_result[:match_type],
+        actual_match_type: match_result[:actual_match_type],  # Add actual match type for frontend logic
         partner: {
           id: match_result[:partner_id] || 'video',
           type: match_result[:match_type]
         },
         is_initiator: match_result[:is_initiator],
         session_id: session&.session_id,
+        session_version: match_result[:session_version],
         video_id: match_result[:video_id],
         video_url: match_result[:video_url],
         video_name: match_result[:video_name]
@@ -80,50 +82,85 @@ class Api::V1::VideoChatController < ApplicationController
     end
 
     if waiting_entry.room_id.present?
-      # User has been matched
-      Rails.logger.info "✅ User #{user_id} matched with room #{waiting_entry.room_id}, type: #{waiting_entry.match_type}"
+      # User has been matched - DO NOT call find_match again!
+      Rails.logger.info "✅ User #{user_id} already matched with room #{waiting_entry.room_id}, type: #{waiting_entry.match_type}"
+      Rails.logger.info "🔒 User is in active connection - returning current match status"
+
+      # Get the user's actual role for proper match_type
+      user = User.find(user_id)
+      user_match_type = user.role == 'staff' ? 'staff' : 'real_user'
+
+      Rails.logger.info "🔍 User #{user_id} role: #{user.role}, returning match_type: #{user_match_type}"
+
+      # Determine actual match type based on room's match_type and user roles
+      actual_match_type = case waiting_entry.match_type
+      when 'video'
+        'video'
+      when 'real_user'
+        # Check if this is actually a staff match by looking at partner
+        if waiting_entry.partner_user_id
+          partner_user = User.find_by(id: waiting_entry.partner_user_id)
+          partner_user&.role == 'staff' ? 'staff' : 'real_user'
+        else
+          'real_user'
+        end
+      else
+        waiting_entry.match_type
+      end
+
       render json: {
         status: 'matched',
         room_id: waiting_entry.room_id,
-        match_type: waiting_entry.match_type,
+        match_type: user_match_type,  # Use user's role, not room's match_type
+        actual_match_type: actual_match_type,  # Add actual match type for frontend logic
         partner: {
           id: waiting_entry.partner_user_id || 'video',
-          type: waiting_entry.match_type
+          type: waiting_entry.match_type  # Keep partner type as room's match_type
         },
         is_initiator: waiting_entry.is_initiator,
+        session_version: waiting_entry.session_version,
         video_id: waiting_entry.video_id,
         video_url: waiting_entry.video_info&.dig(:url),
         video_name: waiting_entry.video_info&.dig(:name)
       }
+      return  # Explicitly return to prevent any further processing
+    end
+
+    # Check if we should try to find a match now
+    Rails.logger.info "🔄 No room_id yet, trying to find match for user #{user_id}"
+    matching_service = PoolMatchingService.new(user_id)
+    match_result = matching_service.find_match
+
+    if match_result[:success]
+      # Create session for tracking
+      session = matching_service.create_session(match_result)
+
+      # Get the user's actual role for proper match_type
+      user = User.find(user_id)
+      user_match_type = user.role == 'staff' ? 'staff' : 'real_user'
+
+      Rails.logger.info "✅ Found match for user #{user_id}: #{match_result.inspect}"
+      Rails.logger.info "🔍 User #{user_id} role: #{user.role}, returning match_type: #{user_match_type}"
+
+      render json: {
+        status: 'matched',
+        room_id: match_result[:room_id],
+        match_type: user_match_type,  # Use user's role, not room's match_type
+        actual_match_type: match_result[:actual_match_type],  # Add actual match type for frontend logic
+        partner: {
+          id: match_result[:partner_id] || 'video',
+          type: match_result[:match_type]  # Keep partner type as room's match_type
+        },
+        is_initiator: match_result[:is_initiator],
+        session_id: session&.session_id,
+        session_version: match_result[:session_version],
+        video_id: match_result[:video_id],
+        video_url: match_result[:video_url],
+        video_name: match_result[:video_name]
+      }
     else
-      # Check if we should try to find a match now
-      Rails.logger.info "🔄 No room_id yet, trying to find match for user #{user_id}"
-      matching_service = PoolMatchingService.new(user_id)
-      match_result = matching_service.find_match
-
-      if match_result[:success]
-        # Create session for tracking
-        session = matching_service.create_session(match_result)
-
-        Rails.logger.info "✅ Found match for user #{user_id}: #{match_result.inspect}"
-        render json: {
-          status: 'matched',
-          room_id: match_result[:room_id],
-          match_type: match_result[:match_type],
-          partner: {
-            id: match_result[:partner_id] || 'video',
-            type: match_result[:match_type]
-          },
-          is_initiator: match_result[:is_initiator],
-          session_id: session&.session_id,
-          video_id: match_result[:video_id],
-          video_url: match_result[:video_url],
-          video_name: match_result[:video_name]
-        }
-      else
-        Rails.logger.info "⏳ No match found for user #{user_id}: #{match_result[:message]}"
-        render json: { status: 'waiting', message: match_result[:message] }
-      end
+      Rails.logger.info "⏳ No match found for user #{user_id}: #{match_result[:message]}"
+      render json: { status: 'waiting', message: match_result[:message] }
     end
   end
 
@@ -227,26 +264,7 @@ class Api::V1::VideoChatController < ApplicationController
       return
     end
 
-    # End current session if exists
-    if waiting_entry.room_id.present?
-      end_current_session(waiting_entry.room_id, user_id)
-
-      # Clean up partner's waiting room entry
-      if waiting_entry.partner_user_id
-        partner_entry = VideoWaitingRoom.find_by(user_id: waiting_entry.partner_user_id)
-        partner_entry&.destroy
-      end
-    end
-
-    # Reset waiting entry for next match
-    waiting_entry.update!(
-      room_id: nil,
-      partner_user_id: nil,
-      status: 'waiting',
-      match_type: 'real_user'
-    )
-
-    # Try to find next match
+    # Try to find next match (service will handle room cleanup automatically)
     matching_service = PoolMatchingService.new(user_id)
     match_result = matching_service.find_next_match
 
@@ -254,19 +272,25 @@ class Api::V1::VideoChatController < ApplicationController
       # Create session for tracking
       session = matching_service.create_session(match_result)
 
+      # Get updated user info after potential sequence advancement
+      updated_user_info = matching_service.get_updated_sequence_info
+
       render json: {
         status: 'matched',
         room_id: match_result[:room_id],
         match_type: match_result[:match_type],
+        actual_match_type: match_result[:actual_match_type],  # Add actual match type for frontend logic
         partner: {
           id: match_result[:partner_id] || 'video',
           type: match_result[:match_type]
         },
         is_initiator: match_result[:is_initiator],
         session_id: session&.session_id,
+        session_version: match_result[:session_version],
         video_id: match_result[:video_id],
         video_url: match_result[:video_url],
-        video_name: match_result[:video_name]
+        video_name: match_result[:video_name],
+        updated_user_info: updated_user_info
       }
     else
       render json: { status: 'waiting', message: match_result[:message] }

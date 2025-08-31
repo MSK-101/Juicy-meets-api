@@ -36,16 +36,28 @@ class Api::V1::VideoChatController < ApplicationController
       return
     end
 
-        if waiting_entry.room_id.present?
+    if waiting_entry.room_id.present?
       # User has been matched
       partner = waiting_entry.partner_user
+
+      # Determine match type based on waiting entry
+      match_type = waiting_entry.match_type || 'real_user'
+
+      # For staff matches, we need to determine if the partner is staff
+      if match_type == 'real_user' && partner&.role == 'staff'
+        match_type = 'staff'
+      elsif match_type == 'staff' && partner&.role != 'staff'
+        match_type = 'real_user'
+      end
 
       render json: {
         status: 'matched',
         room_id: waiting_entry.room_id,
+        match_type: match_type,
         partner: {
           id: partner.id,
-          username: partner.username || "User#{partner.id}"
+          username: partner.username || "User#{partner.id}",
+          role: partner.role
         },
         is_initiator: waiting_entry.is_initiator
       }

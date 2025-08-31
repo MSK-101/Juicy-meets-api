@@ -1,10 +1,13 @@
 class VideoWaitingRoom < ApplicationRecord
-  # Using string user_id instead of User model for simplicity
-  # belongs_to :user
-  # belongs_to :partner_user, class_name: 'User', optional: true
+  # Restore proper User model associations
+  belongs_to :user
+  belongs_to :partner_user, class_name: 'User', optional: true
+  belongs_to :pool, optional: true
+  belongs_to :sequence, optional: true
 
   validates :user_id, presence: true, uniqueness: true
   validates :status, inclusion: { in: %w[waiting matched] }
+  validates :session_version, presence: true, if: :matched?
 
   scope :waiting, -> { where(status: 'waiting', room_id: nil) }
   scope :matched, -> { where(status: 'matched').where.not(room_id: nil) }
@@ -59,6 +62,10 @@ class VideoWaitingRoom < ApplicationRecord
     match_type == 'real_user'
   end
 
+  def matched?
+    status == 'matched'
+  end
+
   # Get video information if this is a video match
   def video_info
     return nil unless is_video? && video_id.present?
@@ -70,6 +77,19 @@ class VideoWaitingRoom < ApplicationRecord
       id: video.id,
       name: video.name,
       url: video.video_file.attached? ? video.video_file.url : nil
+    }
+  end
+
+  # Get session information for WebRTC signaling
+  def session_info
+    return nil unless matched?
+
+    {
+      room_id: room_id,
+      session_version: session_version,
+      match_type: match_type,
+      is_initiator: is_initiator,
+      partner_user_id: partner_user_id
     }
   end
 end

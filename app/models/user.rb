@@ -15,6 +15,8 @@ class User < ApplicationRecord
   # Validations
   validates :email, presence: true, uniqueness: true
   validates :coin_balance, numericality: { greater_than_or_equal_to: 0 }
+  validates :videos_watched_in_current_sequence, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
+  validates :sequence_total_videos, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
 
   # Callbacks
   before_save :update_last_activity, if: :status_changed?
@@ -43,6 +45,10 @@ class User < ApplicationRecord
   # Send password email
   def send_password_email
     UserMailer.password_email(self, password).deliver_now
+  end
+
+  def pool_id
+    pool.id
   end
 
   # Free coin distribution logic
@@ -104,6 +110,51 @@ class User < ApplicationRecord
 
   def next_sequence(curr_pos)
     pool.sequences.active.find_by(position: curr_pos + 1) || pool.sequences.active.ordered.first
+  end
+
+  # New method: Get current sequence info
+  def current_sequence_info
+    return nil unless pool && sequence_id
+
+    sequence = pool.sequences.find_by(id: sequence_id)
+    return nil unless sequence
+
+    {
+      sequence_id: sequence.id,
+      sequence_name: sequence.name,
+      sequence_position: sequence.position,
+      videos_watched: videos_watched_in_current_sequence || 0,
+      total_videos: sequence.video_count,
+      progress_percentage: calculate_progress_percentage
+    }
+  end
+
+  # New method: Calculate progress percentage for current sequence
+  def calculate_progress_percentage
+    return 0 unless videos_watched_in_current_sequence && sequence_total_videos && sequence_total_videos > 0
+
+    ((videos_watched_in_current_sequence.to_f / sequence_total_videos) * 100).round(2)
+  end
+
+  # New method: Check if user is ready for next sequence
+  def ready_for_next_sequence?
+    return false unless videos_watched_in_current_sequence && sequence_total_videos
+
+    videos_watched_in_current_sequence >= sequence_total_videos
+  end
+
+  # New method: Reset video count for new sequence
+  def reset_video_count_for_new_sequence
+    update!(videos_watched_in_current_sequence: 0)
+  end
+
+  # New method: Update sequence info
+  def update_sequence_info(sequence_id, total_videos)
+    update!(
+      sequence_id: sequence_id,
+      sequence_total_videos: total_videos,
+      videos_watched_in_current_sequence: 0
+    )
   end
 
   # Send forgot password email with new password

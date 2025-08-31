@@ -10,7 +10,7 @@ class Api::V1::SequencesController < Api::V1::Admin::BaseController
       sequences: @sequences.map do |sequence|
         {
           id: sequence.id,
-          name: sequence.name || "Sequence #{sequence.position}",
+          name: sequence.name,
           video_count: sequence.video_count,
           active: sequence.active,
           position: sequence.position,
@@ -70,7 +70,7 @@ class Api::V1::SequencesController < Api::V1::Admin::BaseController
       render json: {
         sequence: {
           id: @sequence.id,
-          name: @sequence.name || "Sequence #{@sequence.position}",
+          name: @sequence.name,
           video_count: @sequence.video_count,
           active: @sequence.active,
           position: @sequence.position,

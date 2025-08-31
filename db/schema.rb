@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_08_30_152937) do
+ActiveRecord::Schema[7.2].define(version: 2025_08_31_162253) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -145,7 +145,6 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_30_152937) do
     t.bigint "pool_id", null: false
     t.bigint "sequence_id", null: false
     t.string "status", default: "active", null: false
-    t.string "assigned_gender", null: false
     t.text "notes"
     t.datetime "last_online_at"
     t.integer "total_chat_time", default: 0
@@ -156,7 +155,6 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_30_152937) do
     t.index ["pool_id", "status"], name: "index_staff_assignments_on_pool_id_and_status"
     t.index ["pool_id"], name: "index_staff_assignments_on_pool_id"
     t.index ["sequence_id"], name: "index_staff_assignments_on_sequence_id"
-    t.index ["status", "assigned_gender"], name: "index_staff_assignments_on_status_and_assigned_gender"
     t.index ["user_id"], name: "index_staff_assignments_on_user_id"
   end
 
@@ -193,6 +191,9 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_30_152937) do
     t.integer "role", default: 0, null: false
     t.integer "status", default: 0, null: false
     t.integer "user_status", default: 0, null: false
+    t.bigint "sequence_id"
+    t.integer "videos_watched_in_current_sequence"
+    t.integer "sequence_total_videos"
     t.index ["coin_balance"], name: "index_users_on_coin_balance"
     t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["email"], name: "index_users_on_email", unique: true
@@ -200,8 +201,11 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_30_152937) do
     t.index ["provider", "uid"], name: "index_users_on_provider_and_uid", unique: true
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["role"], name: "index_users_on_role"
+    t.index ["sequence_id"], name: "index_users_on_sequence_id"
+    t.index ["sequence_total_videos"], name: "index_users_on_sequence_total_videos"
     t.index ["status"], name: "index_users_on_status"
     t.index ["user_status"], name: "index_users_on_user_status"
+    t.index ["videos_watched_in_current_sequence"], name: "index_users_on_videos_watched_in_current_sequence"
   end
 
   create_table "video_chat_sessions", force: :cascade do |t|
@@ -238,25 +242,27 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_30_152937) do
   end
 
   create_table "video_waiting_rooms", force: :cascade do |t|
-    t.string "user_id", null: false
+    t.bigint "user_id", null: false
     t.string "room_id"
-    t.string "partner_user_id"
+    t.bigint "partner_user_id"
     t.string "status", default: "waiting", null: false
     t.boolean "is_initiator", default: false
     t.datetime "joined_at", null: false
-    t.datetime "created_at", null: false
-    t.datetime "updated_at", null: false
     t.bigint "pool_id"
     t.bigint "sequence_id"
     t.string "match_type", default: "real_user", null: false
     t.bigint "video_id"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.string "session_version"
+    t.index ["partner_user_id"], name: "index_video_waiting_rooms_on_partner_user_id"
     t.index ["pool_id", "status"], name: "index_video_waiting_rooms_on_pool_id_and_status"
     t.index ["pool_id"], name: "index_video_waiting_rooms_on_pool_id"
     t.index ["room_id"], name: "index_video_waiting_rooms_on_room_id"
     t.index ["sequence_id", "status"], name: "index_video_waiting_rooms_on_sequence_id_and_status"
     t.index ["sequence_id"], name: "index_video_waiting_rooms_on_sequence_id"
     t.index ["status"], name: "index_video_waiting_rooms_on_status"
-    t.index ["user_id"], name: "index_video_waiting_rooms_on_user_id", unique: true
+    t.index ["user_id"], name: "index_video_waiting_rooms_on_user_id"
   end
 
   create_table "videos", force: :cascade do |t|
@@ -287,6 +293,7 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_30_152937) do
   add_foreign_key "staff_assignments", "sequences"
   add_foreign_key "staff_assignments", "users"
   add_foreign_key "user_ip_addresses", "users"
+  add_foreign_key "users", "sequences"
   add_foreign_key "video_chat_sessions", "pools"
   add_foreign_key "video_chat_sessions", "sequences"
   add_foreign_key "video_chat_sessions", "users"
@@ -295,6 +302,8 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_30_152937) do
   add_foreign_key "video_chat_sessions", "videos"
   add_foreign_key "video_waiting_rooms", "pools"
   add_foreign_key "video_waiting_rooms", "sequences"
+  add_foreign_key "video_waiting_rooms", "users"
+  add_foreign_key "video_waiting_rooms", "users", column: "partner_user_id"
   add_foreign_key "videos", "admins"
   add_foreign_key "videos", "pools"
   add_foreign_key "videos", "sequences"
