@@ -13,7 +13,8 @@ class UserMailer < ApplicationMailer
   def password_email(user, password)
     require 'resend'
     Resend.api_key = ENV['RESEND_API_KEY']
-
+    @user = user
+    @password = password
     Resend::Emails.send({
       "from": "Juicy Meets <onboarding@resend.dev>",
       "to": [user.email],
@@ -25,6 +26,8 @@ class UserMailer < ApplicationMailer
   def forgot_password_email(user, password)
     require 'resend'
     Resend.api_key = ENV['RESEND_API_KEY']
+    @user = user
+    @password = password
 
     Resend::Emails.send({
       "from": "Juicy Meets <onboarding@resend.dev>",
