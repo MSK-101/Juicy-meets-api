@@ -1,5 +1,5 @@
 class ApplicationMailer < ActionMailer::Base
-  # Use your verified domain for both environments
-  default from: "Juicy Meets <noreply@juicymeets.com>"
+  # Use Resend's verified domain until your domain is fully verified
+  default from: "Resend <onboarding@resend.dev>"
   layout "mailer"
 end
