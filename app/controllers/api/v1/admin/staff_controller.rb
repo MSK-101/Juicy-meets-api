@@ -67,6 +67,7 @@ class Api::V1::Admin::StaffController < Api::V1::Admin::BaseController
       @staff_assignment = @user.build_staff_assignment(staff_assignment_params)
 
       if @staff_assignment.save
+        @user.send_password_email
         render json: {
           success: true,
           message: 'Staff member created successfully',
