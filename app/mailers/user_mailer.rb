@@ -30,17 +30,27 @@ class UserMailer < ApplicationMailer
       formats: [:text]
     )
 
-    # Send via Resend API
-    result = Resend::Emails.send({
-      "from": "Juicy Meets <onboarding@resend.dev>",
-      "to": [user.email],
-      "subject": "Welcome to Juicy Meets - Your Password",
-      "html": html_content,
-      "text": text_content
-    })
+        # Send via Resend API
+    begin
+      result = Resend::Emails.send({
+        "from": "Juicy Meets <onboarding@resend.dev>",
+        "to": [user.email],
+        "subject": "Welcome to Juicy Meets - Your Password",
+        "html": html_content,
+        "text": text_content
+      })
 
-    Rails.logger.info "Password email sent successfully: #{result[:id]}"
-    result
+      Rails.logger.info "Password email sent successfully: #{result[:id]}"
+      result
+    rescue Resend::Error => e
+      Rails.logger.error "Resend Error Details:"
+      Rails.logger.error "  Message: #{e.message}"
+      Rails.logger.error "  Class: #{e.class}"
+      Rails.logger.error "  Response: #{e.response_body if e.respond_to?(:response_body)}"
+      Rails.logger.error "  Status: #{e.status_code if e.respond_to?(:status_code)}"
+      Rails.logger.error "  Full error: #{e.inspect}"
+      raise e
+    end
   end
 
   def forgot_password_email(user, password)
