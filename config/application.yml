@@ -4,8 +4,8 @@ NEXT_PUBLIC_TURN_URL: turn:global.relay.metered.ca:80
 NEXT_PUBLIC_TURN_USERNAME: efb0b7b7b6b0b7b7b7b7b7b7
 NEXT_PUBLIC_TURN_CREDENTIAL: efb0b7b7b7b7b7b7b7b7b7b7b7b7b7b7
 
-# SendGrid configuration
-SENDGRID_API_KEY: your_sendgrid_api_key_here
+# Resend configuration
+RESEND_API_KEY: your_resend_api_key_here
 
 # Application configuration
 APP_HOST: your-domain.com

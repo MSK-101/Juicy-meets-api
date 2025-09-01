@@ -71,21 +71,12 @@ Rails.application.configure do
   # caching is enabled.
   config.action_mailer.perform_caching = false
 
-  # Enable email delivery errors for debugging in production
+    # Enable email delivery errors for debugging in production
   config.action_mailer.raise_delivery_errors = true
   config.action_mailer.perform_deliveries = true
 
-  # Configure SendGrid for email delivery
-  config.action_mailer.delivery_method = :smtp
-  config.action_mailer.smtp_settings = {
-    address: 'smtp.sendgrid.net',
-    port: 587,
-    domain: ENV.fetch('APP_HOST', 'your-domain.com'),
-    user_name: 'apikey',
-    password: ENV['SENDGRID_API_KEY'],
-    authentication: 'plain',
-    enable_starttls_auto: true
-  }
+  # Configure Resend for email delivery
+  config.action_mailer.delivery_method = :resend
 
   # Enable locale fallbacks for I18n (makes lookups for any locale fall back to
   # the I18n.default_locale when a translation cannot be found).

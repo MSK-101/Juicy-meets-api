@@ -61,8 +61,8 @@ group :development, :test do
   gem "letter_opener"
 end
 
-# SendGrid for production email delivery
-gem "sendgrid-ruby"
+# Resend for production email delivery
+gem "resend"
 
 # Environment variable management
 gem "figaro"
