@@ -1,5 +1,7 @@
 class PoolMatchingService
   include ActiveSupport::Configurable
+  require 'set'
+  require 'digest'
 
   # ============================================================================
   # MATCHING RULES:
@@ -29,7 +31,7 @@ class PoolMatchingService
     @waiting_entry = VideoWaitingRoom.find_by(user_id: user_id)
   end
 
-  # Main matching method - tries to find the best match with retry logic
+  # Main matching method - tries to find the best match with proper priority order
   def find_match(max_retries = 3)
     Rails.logger.info "🔍 Finding match for user #{@user_id} in pool #{@pool&.name} (ID: #{@pool&.id}), sequence #{@sequence&.name} (ID: #{@sequence&.id})"
 
@@ -49,36 +51,12 @@ class PoolMatchingService
       attempt += 1
       Rails.logger.info "🔄 Match attempt #{attempt}/#{max_retries} for user #{@user_id}"
 
-      # Step 1: Try to match with another real user from same pool
-      Rails.logger.info "🔍 Step 1: Trying real user match..."
-      real_user_match = find_real_user_match
-      if real_user_match[:success]
-        Rails.logger.info "✅ Real user match successful!"
-        return real_user_match
-      end
+      # Use the new structured matching approach with proper priority
+      match_result = find_match_with_priority_order
 
-      # Step 2: Try to match with staff (ONLY for app users, never for staff users)
-      if @user.role != 'staff'
-        Rails.logger.info "🔍 Step 2: Trying staff match for app user..."
-        staff_match = find_staff_match
-        if staff_match[:success]
-          Rails.logger.info "✅ Staff match successful!"
-          return staff_match
-        end
-      else
-        Rails.logger.info "👨‍💼 Step 2: Skipping staff match for staff user #{@user_id} - staff only match with real app users"
-      end
-
-      # Step 3: Check if we should show video next (ONLY for app users, never for staff)
-      if @user.role != 'staff'
-        Rails.logger.info "🔍 Step 3: Checking video availability for app user..."
-        video_match = find_video_match
-        if video_match[:success]
-          Rails.logger.info "✅ Video match successful!"
-          return video_match
-        end
-      else
-        Rails.logger.info "👨‍💼 Step 3: Skipping video check for staff user #{@user_id} - staff only wait for real app users"
+      if match_result[:success]
+        Rails.logger.info "✅ Match successful: #{match_result[:match_type]}"
+        return match_result
       end
 
       # If we get here, no match was found
@@ -102,6 +80,74 @@ class PoolMatchingService
     { success: false, reason: 'No matches available after retries' }
   end
 
+  # NEW: Structured matching with proper priority order
+  def find_match_with_priority_order
+    Rails.logger.info "🎯 Using structured priority matching for user #{@user_id}"
+
+    # PRIORITY 1: No repeats (avoid recent connections)
+    Rails.logger.info "🔍 Priority 1: Trying matches without repeats..."
+
+    # 1.1: Real user match (no repeats)
+    if @user.role != 'staff'
+      real_user_no_repeat = find_real_user_match_no_repeats
+      if real_user_no_repeat[:success]
+        Rails.logger.info "✅ Priority 1.1: Real user match (no repeats) successful!"
+        return real_user_no_repeat
+      end
+    end
+
+    # 1.2: Staff match (no repeats) - only for app users
+    if @user.role != 'staff'
+      staff_no_repeat = find_staff_match_no_repeats
+      if staff_no_repeat[:success]
+        Rails.logger.info "✅ Priority 1.2: Staff match (no repeats) successful!"
+        return staff_no_repeat
+      end
+    end
+
+    # 1.3: Video match (no repeats) - only for app users
+    if @user.role != 'staff'
+      video_no_repeat = find_video_match_no_repeats
+      if video_no_repeat[:success]
+        Rails.logger.info "✅ Priority 1.3: Video match (no repeats) successful!"
+        return video_no_repeat
+      end
+    end
+
+    # PRIORITY 2: With repeats (fallback when no fresh matches)
+    Rails.logger.info "🔍 Priority 2: Trying matches with repeats (fallback)..."
+
+    # 2.1: Real user match (with repeats)
+    if @user.role != 'staff'
+      real_user_with_repeat = find_real_user_match_with_repeats
+      if real_user_with_repeat[:success]
+        Rails.logger.info "✅ Priority 2.1: Real user match (with repeats) successful!"
+        return real_user_with_repeat
+      end
+    end
+
+    # 2.2: Staff match (with repeats) - only for app users
+    if @user.role != 'staff'
+      staff_with_repeat = find_staff_match_with_repeats
+      if staff_with_repeat[:success]
+        Rails.logger.info "✅ Priority 2.2: Staff match (with repeats) successful!"
+        return staff_with_repeat
+      end
+    end
+
+    # 2.3: Video match (with repeats) - only for app users
+    if @user.role != 'staff'
+      video_with_repeat = find_video_match_with_repeats
+      if video_with_repeat[:success]
+        Rails.logger.info "✅ Priority 2.3: Video match (with repeats) successful!"
+        return video_with_repeat
+      end
+    end
+
+    Rails.logger.info "❌ No matches available in any priority level"
+    { success: false, reason: 'No matches available in any priority level' }
+  end
+
   # Find next match when user swipes or disconnects
   def find_next_match
     return { error: 'User not found' } unless @user
@@ -109,11 +155,33 @@ class PoolMatchingService
     # First, handle disconnection of both users if they were in a room together
     handle_room_disconnection
 
-    # DON'T increment video count here - only increment AFTER successful match completion
-    # increment_video_count_and_check_sequence_advancement  ← REMOVED
+    # Check and advance sequence BEFORE finding next match
+    # This ensures we're looking for matches in the correct sequence
+    check_and_advance_sequence_if_needed
 
-    # Try to find next match
-    find_match
+    # Try to find next match with better error handling
+    match_result = find_match
+
+    # If no real user match found, provide better fallback logic
+    if !match_result[:success] && @user.role != 'staff'
+      Rails.logger.info "🔄 No real user match found for app user #{@user_id}, checking for staff/video fallback..."
+
+      # Try staff match as fallback
+      staff_match = find_staff_match
+      if staff_match[:success]
+        Rails.logger.info "✅ Staff match fallback successful for app user #{@user_id}"
+        return staff_match
+      end
+
+      # Try video match as final fallback
+      video_match = find_video_match
+      if video_match[:success]
+        Rails.logger.info "✅ Video match fallback successful for app user #{@user_id}"
+        return video_match
+      end
+    end
+
+    match_result
   end
 
   # Handle disconnection when user swipes from a shared room
@@ -131,31 +199,232 @@ class PoolMatchingService
 
       # Disconnect all users from this room
       users_in_room.each do |user_entry|
-        # Don't disconnect the current user - they're already being handled
-        next if user_entry.user_id == @user_id
-
         Rails.logger.info "🔄 Disconnecting user #{user_entry.user_id} from room #{room_id}"
 
-        # Reset their waiting entry for new matching
-        user_entry.update!(
-          room_id: nil,
-          partner_user_id: nil,
-          status: 'waiting',
-          match_type: 'real_user'
-        )
+        # Handle staff disconnection differently
+        if user_entry.user.role == 'staff'
+          user_entry.update!(
+            room_id: nil,
+            partner_user_id: nil,
+            status: 'waiting',
+            match_type: 'staff',
+            session_version: nil
+          )
+          Rails.logger.info "✅ Staff user #{user_entry.user_id} reset to waiting status"
+        else
+          # Reset their waiting entry for new matching
+          user_entry.update!(
+            room_id: nil,
+            partner_user_id: nil,
+            status: 'waiting',
+            match_type: 'real_user',
+            session_version: nil  # Clear session version to prevent stale connections
+          )
+          Rails.logger.info "✅ Real user #{user_entry.user_id} reset to waiting status"
+        end
 
-        # Trigger new match finding for the other user
-        trigger_new_match_for_user(user_entry.user_id)
+        # Trigger new match finding for the other user (not the current user)
+        if user_entry.user_id != @user_id
+          Rails.logger.info "🔄 Triggering new match for user #{user_entry.user_id}"
+          trigger_new_match_for_user(user_entry.user_id)
+        end
       end
+    else
+      Rails.logger.info "🔄 Only one user in room #{room_id}, cleaning up current user only"
     end
 
     # Clean up current user's entry
+    if @user.role == 'staff'
+      @waiting_entry.update!(
+        room_id: nil,
+        partner_user_id: nil,
+        status: 'waiting',
+        match_type: 'staff',
+        session_version: nil
+      )
+      Rails.logger.info "✅ Current staff user #{@user_id} reset to waiting status"
+    else
+      @waiting_entry.update!(
+        room_id: nil,
+        partner_user_id: nil,
+        status: 'waiting',
+        match_type: 'real_user',
+        session_version: nil  # Clear session version to prevent stale connections
+      )
+      Rails.logger.info "✅ Current real user #{@user_id} reset to waiting status"
+    end
+
+    # Mark this room as recently disconnected to prevent immediate reuse
+    mark_room_as_recently_disconnected(room_id)
+
+    Rails.logger.info "✅ Room #{room_id} disconnection completed for user #{@user_id}"
+  end
+
+  # Check and clean up stale room assignments
+  def cleanup_stale_room_assignments
+    Rails.logger.info "🧹 Checking for stale room assignments for user #{@user_id}"
+
+    # Find any waiting entries that might have stale room assignments
+    stale_entries = VideoWaitingRoom.where(
+      user_id: @user_id,
+      status: 'waiting'
+    ).where.not(room_id: nil)
+
+    if stale_entries.any?
+      Rails.logger.info "🧹 Found #{stale_entries.count} stale room assignments for user #{@user_id}"
+
+      stale_entries.each do |entry|
+        room_id = entry.room_id
+        Rails.logger.info "🧹 Cleaning up stale room #{room_id} for user #{@user_id}"
+
+        # Check if other users are still in this room
+        other_users_in_room = VideoWaitingRoom.where(room_id: room_id)
+                                             .where.not(user_id: @user_id)
+
+        if other_users_in_room.any?
+          Rails.logger.info "🧹 Found #{other_users_in_room.count} other users still in stale room #{room_id}"
+
+          # Clean up other users in the stale room
+          other_users_in_room.each do |other_entry|
+            if other_entry.user.role == 'staff'
+              other_entry.update!(
+                room_id: nil,
+                partner_user_id: nil,
+                status: 'waiting',
+                match_type: 'staff',
+                session_version: nil
+              )
+            else
+              other_entry.update!(
+                room_id: nil,
+                partner_user_id: nil,
+                status: 'waiting',
+                match_type: 'real_user',
+                session_version: nil
+              )
+            end
+            Rails.logger.info "🧹 Cleaned up user #{other_entry.user_id} from stale room #{room_id}"
+          end
+        end
+
+        # Clean up current user's entry
+        entry.update!(
+          room_id: nil,
+          partner_user_id: nil,
+          session_version: nil
+        )
+
+        # Mark room as recently disconnected
+        mark_room_as_recently_disconnected(room_id)
+        Rails.logger.info "🧹 Cleaned up stale room #{room_id} for user #{@user_id}"
+      end
+    else
+      Rails.logger.info "🧹 No stale room assignments found for user #{@user_id}"
+    end
+  end
+
+  # Ensure proper cleanup when user swipes
+  def ensure_partner_cleanup_on_swipe
+    return unless @waiting_entry&.room_id.present?
+
+    room_id = @waiting_entry.room_id
+    Rails.logger.info "🧹 Ensuring partner cleanup for user #{@user_id} in room #{room_id}"
+
+    # Find partner in the same room
+    partner_entry = VideoWaitingRoom.where(room_id: room_id)
+                                   .where.not(user_id: @user_id)
+                                   .first
+
+    if partner_entry
+      Rails.logger.info "🧹 Found partner #{partner_entry.user_id} in room #{room_id}, ensuring cleanup"
+
+      # Reset partner's entry
+      if partner_entry.user.role == 'staff'
+        partner_entry.update!(
+          room_id: nil,
+          partner_user_id: nil,
+          status: 'waiting',
+          match_type: 'staff',
+          session_version: nil
+        )
+        Rails.logger.info "✅ Partner staff user #{partner_entry.user_id} properly reset"
+      else
+        partner_entry.update!(
+          room_id: nil,
+          partner_user_id: nil,
+          status: 'waiting',
+          match_type: 'real_user',
+          session_version: nil
+        )
+        Rails.logger.info "✅ Partner real user #{partner_entry.user_id} properly reset"
+      end
+
+      # Trigger new match for partner
+      trigger_new_match_for_user(partner_entry.user_id)
+    else
+      Rails.logger.info "🧹 No partner found in room #{room_id}, cleanup not needed"
+    end
+  end
+
+  # Mark room as recently disconnected to prevent immediate reuse
+  def mark_room_as_recently_disconnected(room_id)
+    # Store the room ID in Redis or a similar cache with a TTL
+    # This prevents the same room from being reused immediately
+    Rails.logger.info "🚫 Marking room #{room_id} as recently disconnected (preventing reuse)"
+
+    # Use Rails cache for global room tracking (works across server instances)
+    Rails.cache.write("disconnected_room_#{room_id}", true, expires_in: 5.minutes)
+
+    # Also keep local tracking for backward compatibility
+    @recently_disconnected_rooms ||= Set.new
+    @recently_disconnected_rooms.add(room_id)
+
+    # Clean up old entries (older than 5 minutes)
+    cleanup_old_disconnected_rooms
+  end
+
+  # Clean up old disconnected room entries
+  def cleanup_old_disconnected_rooms
+    return unless @recently_disconnected_rooms
+
+    # Remove rooms older than 5 minutes
+    # In production, use Redis TTL instead
+    @recently_disconnected_rooms.clear if @recently_disconnected_rooms.size > 100
+  end
+
+  # Check if room was recently disconnected (global check)
+  def room_recently_disconnected?(room_id)
+    # Check global cache first
+    if Rails.cache.exist?("disconnected_room_#{room_id}")
+      Rails.logger.info "🚫 Room #{room_id} was recently disconnected (global cache)"
+      return true
+    end
+
+    # Fallback to local tracking
+    if @recently_disconnected_rooms&.include?(room_id)
+      Rails.logger.info "🚫 Room #{room_id} was recently disconnected (local tracking)"
+      return true
+    end
+
+    false
+  end
+
+  # Handle staff disconnection properly
+  def handle_staff_disconnection
+    return unless @user.role == 'staff'
+
+    Rails.logger.info "👨‍💼 Staff user #{@user_id} disconnected, ensuring proper state reset..."
+
+    # Staff users should always be available for new real user matches
     @waiting_entry.update!(
       room_id: nil,
       partner_user_id: nil,
       status: 'waiting',
-      match_type: 'real_user'
+      match_type: 'staff',
+      session_version: nil
     )
+
+    Rails.logger.info "✅ Staff user #{@user_id} reset and ready for new real user matches"
   end
 
   # Trigger new match finding for a disconnected user
@@ -373,6 +642,21 @@ class PoolMatchingService
                     .where(sequence_id: @sequence.id)
                     .where(room_id: nil)
                     .where.not(users: { id: users_in_active_sessions })
+                    .where.not(users: { id: recently_disconnected_users })  # Prevent matching with recently disconnected users
+  end
+
+  # Get list of users who were recently disconnected from the same room
+  def recently_disconnected_users
+    return [] unless @waiting_entry&.room_id.present?
+
+    # Get users who were in the same room within the last 5 minutes
+    recent_room_users = VideoWaitingRoom.where(
+      room_id: @waiting_entry.room_id,
+      updated_at: 5.minutes.ago..Time.current
+    ).pluck(:user_id)
+
+    Rails.logger.info "🔄 Filtering out recently disconnected users: #{recent_room_users}"
+    recent_room_users
   end
 
   # Unified method for building queries that exclude users in active sessions
@@ -449,6 +733,47 @@ class PoolMatchingService
     end
   end
 
+  # Unified gender matching logic for both real users and staff
+  def find_match_with_gender_preference_logic(base_query, match_type)
+    # Try to find match with preferred gender first (avoiding recent matches)// this is for POOl A only
+    if @user.interested_in.present? && @user.interested_in != 'other' && @user.pool.name == 'Pool A'
+      preferred_match = find_match_with_gender_preference_and_avoid_repeats(base_query, @user.interested_in)
+      if preferred_match
+        Rails.logger.info "👥 Found preferred gender match: #{preferred_match.user_id || preferred_match.user.id}"
+        return { success: true, match: preferred_match }
+      end
+
+      # If no preferred gender available, try same gender as fallback
+      Rails.logger.info "👥 No preferred gender (#{@user.interested_in}) available, trying same gender fallback"
+      same_gender = @user.gender
+      if same_gender.present?
+        same_gender_match = find_match_with_gender_preference_and_avoid_repeats(base_query, same_gender)
+        if same_gender_match
+          Rails.logger.info "👥 Found same gender fallback match: #{same_gender_match.user_id || same_gender_match.user.id}"
+          return { success: true, match: same_gender_match }
+        end
+      end
+    end
+
+    # If no gender preference or no gender-based matches, try any available user (avoiding repeats)
+    Rails.logger.info "👥 Trying match without gender preference (avoiding repeats)"
+    any_match = find_match_avoiding_repeats(base_query)
+    if any_match
+      Rails.logger.info "👥 Found any available match: #{any_match.user_id || any_match.user.id}"
+      return { success: true, match: any_match }
+    end
+
+    # If still no match, try with repeats allowed (last resort)
+    Rails.logger.info "👥 No matches available, trying with repeats allowed (last resort)"
+    last_resort_match = base_query.first
+    if last_resort_match
+      Rails.logger.info "👥 Found last resort match (with repeat): #{last_resort_match.user_id || last_resort_match.user.id}"
+      return { success: true, match: last_resort_match }
+    end
+
+    { success: false, reason: 'No matches available' }
+  end
+
   # Core matching methods with gender-based query support
   def find_real_user_match
     Rails.logger.info "👥 Looking for real user match in pool #{@pool.name}, sequence #{@sequence.name}"
@@ -477,7 +802,6 @@ class PoolMatchingService
     Rails.logger.info "👨‍💼 Looking for staff match for app user #{@user_id} in pool #{@pool.name}, sequence #{@sequence.name}"
 
     # Build base query for staff matching
-    # debugger
     base_query = build_staff_query
 
     # Use unified gender matching logic
@@ -488,47 +812,6 @@ class PoolMatchingService
     end
 
     return { success: false }
-  end
-
-  # Unified gender matching logic for both real users and staff
-  def find_match_with_gender_preference_logic(base_query, match_type)
-    # Try to find match with preferred gender first (avoiding recent matches)// this is for POOl A only
-    if @user.interested_in.present? && @user.interested_in != 'other' && @user.pool.name == 'Pool A'
-      preferred_match = find_match_with_gender_preference_and_avoid_repeats(base_query, @user.interested_in)
-      if preferred_match
-        Rails.logger.info "👥 Found preferred gender match: #{preferred_match.user_id || preferred_match.user.id}"
-        return { success: true, match: preferred_match }
-      end
-
-      # If no preferred gender available, try same gender as fallback
-      Rails.logger.info "👥 No preferred gender (#{@user.interested_in}) available, trying same gender fallback"
-      same_gender = @user.gender
-      if same_gender.present?
-        same_gender_match = find_match_with_gender_preference_and_avoid_repeats(base_query, same_gender)
-        if same_gender_match
-          Rails.logger.info "👥 Found same gender fallback match: #{same_gender_match.user_id || same_gender_match.user.id}"
-          return { success: true, match: same_gender_match }
-        end
-      end
-    end
-    # debugger
-    # If no gender preference or no gender-based matches, try any available user (avoiding repeats)
-    Rails.logger.info "👥 Trying match without gender preference (avoiding repeats)"
-    any_match = find_match_avoiding_repeats(base_query)
-    if any_match
-      Rails.logger.info "👥 Found any available match: #{any_match.user_id || any_match.user.id}"
-      return { success: true, match: any_match }
-    end
-
-    # If still no match, try with repeats allowed (last resort)
-    Rails.logger.info "👥 No matches available, trying with repeats allowed (last resort)"
-    last_resort_match = base_query.first
-    if last_resort_match
-      Rails.logger.info "👥 Found last resort match (with repeat): #{last_resort_match.user_id || last_resort_match.user.id}"
-      return { success: true, match: last_resort_match }
-    end
-
-    { success: false, reason: 'No matches available' }
   end
 
   def find_video_match
@@ -549,36 +832,7 @@ class PoolMatchingService
     return { success: false, reason: 'No available video found' } unless available_video
 
     # Create room and match with video
-    room_id = create_room_id
-    Rails.logger.info "🎥 Creating room #{room_id} for video #{available_video.id}"
-    session_version = generate_session_version(room_id)
-
-    match_users_in_room(@waiting_entry, nil, room_id, 'video', session_version, nil, available_video.id)
-
-    Rails.logger.info "✅ User #{@user_id} matched with video #{available_video.id} in sequence #{@sequence.name}"
-
-    # NOW increment video count after successful video match
-    increment_video_count_and_check_sequence_advancement
-
-    # Get video URL for frontend
-    video_url = nil
-    if available_video.video_file.attached?
-      video_url = available_video.video_file.url
-      Rails.logger.info "🎥 Video URL generated: #{video_url}"
-    else
-      Rails.logger.warn "🎥 Video file not attached for video #{available_video.id}"
-    end
-
-    {
-      success: true,
-      match_type: 'video',
-      video_id: available_video.id,
-      video_url: video_url,
-      video_name: available_video.name,
-      room_id: room_id,
-      session_version: session_version,
-      is_initiator: true
-    }
+    create_video_match(available_video)
   end
 
   # Query building methods for easy customization
@@ -812,6 +1066,22 @@ class PoolMatchingService
     videos.first
   end
 
+  def get_next_video_for_user_no_repeats
+    return nil unless @sequence
+
+    # Get any available video from current sequence
+    videos = @sequence.videos.active
+    videos.first
+  end
+
+  def get_next_video_for_user_with_repeats
+    return nil unless @sequence
+
+    # Get any available video from current sequence
+    videos = @sequence.videos.active
+    videos.first
+  end
+
   def create_real_user_match(other_user)
     # Use database transaction with locking to prevent race conditions
     ActiveRecord::Base.transaction do
@@ -824,27 +1094,19 @@ class PoolMatchingService
         raise ActiveRecord::Rollback, 'Other user no longer available'
       end
 
-      # Check if we already have a room_id (in case we were matched by the other user)
-      existing_room_id = @waiting_entry.room_id
-
-      # Create room and match atomically
-      room_id = existing_room_id || create_room_id
-
-      if existing_room_id
-        Rails.logger.info "🔗 Using existing room #{room_id} for users #{@user_id} and #{other_user.user_id}"
-      else
-        Rails.logger.info "👥 Creating new room #{room_id} for users #{@user_id} and #{other_user.user_id}"
-      end
+      # ALWAYS create a new room ID to prevent WebRTC m-lines conflicts
+      # This ensures fresh WebRTC context for each connection
+      room_id = create_room_id
+      Rails.logger.info "👥 Creating new room #{room_id} for users #{@user_id} and #{other_user.user_id} (no room reuse to prevent WebRTC conflicts)"
 
       # Generate unique session version to prevent stale signals
       session_version = generate_session_version(room_id)
-
       match_users_in_room(@waiting_entry, other_user, room_id, 'real_user', session_version)
 
       Rails.logger.info "✅ Successfully matched users #{@user_id} and #{other_user.user_id} in room #{room_id}"
 
-      # NOW increment video count after successful match
-      increment_video_count_and_check_sequence_advancement
+      # Increment video count after successful match
+      increment_video_count_after_match
 
       return {
         success: true,
@@ -852,7 +1114,7 @@ class PoolMatchingService
         partner_id: other_user.user_id,
         room_id: room_id,
         session_version: session_version,
-        is_initiator: !existing_room_id # If we already had a room, we're not the initiator
+        is_initiator: @user_id < other_user.user_id  # Lower user ID becomes initiator
       }
     end
   rescue ActiveRecord::Rollback => e
@@ -882,17 +1144,10 @@ class PoolMatchingService
         raise ActiveRecord::Rollback, 'Staff user not in waiting room'
       end
 
-      # Check if either user already has a room_id (in case one was matched by the other)
-      existing_room_id = @waiting_entry.room_id || staff_waiting_entry.room_id
-
-      # Create room and match atomically
-      room_id = existing_room_id || create_room_id
-
-      if existing_room_id
-        Rails.logger.info "🔗 Using existing room #{room_id} for app user #{@user_id} and staff user #{staff_assignment.user.id}"
-      else
-        Rails.logger.info "👨‍💼 Creating new room #{room_id} for app user #{@user_id} and staff user #{staff_assignment.user.id}"
-      end
+      # ALWAYS create a new room ID to prevent WebRTC m-lines conflicts
+      # This ensures fresh WebRTC context for each connection
+      room_id = create_room_id
+      Rails.logger.info "👨‍💼 Creating new room #{room_id} for app user #{@user_id} and staff user #{staff_assignment.user.id} (no room reuse to prevent WebRTC conflicts)"
 
       # Generate unique session version to prevent stale signals
       session_version = generate_session_version(room_id)
@@ -900,8 +1155,8 @@ class PoolMatchingService
       # Now pass both waiting room entries to ensure both get updated
       match_users_in_room(@waiting_entry, staff_waiting_entry, room_id, 'staff', session_version)
 
-      # NOW increment video count after successful match
-      increment_video_count_and_check_sequence_advancement
+      # Increment video count after successful match
+      increment_video_count_after_match
 
       return {
         success: true,
@@ -909,7 +1164,7 @@ class PoolMatchingService
         partner_id: staff_assignment.user.id,
         room_id: room_id,
         session_version: session_version,
-        is_initiator: !existing_room_id # If we already had a room, we're not the initiator
+        is_initiator: @user_id < staff_assignment.user.id  # Lower user ID becomes initiator
       }
     end
   rescue ActiveRecord::Rollback => e
@@ -929,13 +1184,13 @@ class PoolMatchingService
       raise "Staff users cannot be matched with videos"
     end
 
-    # Determine initiator based on who created the room
-    # The user who doesn't have a room_id yet becomes the initiator
-    is_current_user_initiator = current_entry.room_id.nil?
+    # Determine initiator based on user ID (lower ID becomes initiator for consistency)
+    # This ensures consistent initiator assignment for each new connection
+    is_current_user_initiator = @user_id < (other_entry&.user_id || 999999)
 
-    Rails.logger.info "🔗 User #{@user_id} initiator status: #{is_current_user_initiator}"
+    Rails.logger.info "🔗 User #{@user_id} initiator status: #{is_current_user_initiator} (based on user ID comparison)"
 
-    # Update current user's entry
+    # Update current user's entry with their unique session version
     current_entry.update!(
       room_id: room_id,
       partner_user_id: other_entry&.user_id,
@@ -946,18 +1201,18 @@ class PoolMatchingService
       session_version: session_version
     )
 
-    # Update other user's entry if it exists
+    # Update other user's entry with their unique session version
     if other_entry
       # The other user is NOT the initiator (they're the receiver)
       other_entry.update!(
         room_id: room_id,
         partner_user_id: @user_id,
         status: 'matched',
-        is_initiator: false, # Other user is always the receiver
+        is_initiator: !is_current_user_initiator, # Opposite of current user
         match_type: match_type,
         session_version: session_version
       )
-      Rails.logger.info "✅ Updated other user #{other_entry.user_id} waiting room entry (receiver)"
+      Rails.logger.info "✅ Updated other user #{other_entry.user_id} entry (initiator: #{!is_current_user_initiator})"
     end
 
     # Keep waiting room entries with 'matched' status for frontend detection
@@ -973,6 +1228,273 @@ class PoolMatchingService
   end
 
   def generate_session_version(room_id)
-    "version_#{Time.current.to_i}_#{SecureRandom.hex(4)}"
+    # Use room_id hash + timestamp + random to ensure uniqueness even for simultaneous matches
+    # This prevents both users from getting the same session version when matched at the same time
+    room_hash = Digest::MD5.hexdigest(room_id)[0..7]
+    "version_#{Time.current.to_i}_#{room_hash}_#{SecureRandom.hex(4)}"
+  end
+
+  # NEW: Real user matching methods
+  def find_real_user_match_no_repeats
+    Rails.logger.info "👥 Looking for real user match (no repeats) in pool #{@pool.name}, sequence #{@sequence.name}"
+
+    base_query = build_real_user_query_no_repeats
+    match_result = find_match_with_gender_preference_logic(base_query, 'real_user')
+
+    if match_result[:success]
+      return create_real_user_match(match_result[:match])
+    end
+
+    { success: false, reason: 'No real users available (no repeats)' }
+  end
+
+  def find_real_user_match_with_repeats
+    Rails.logger.info "👥 Looking for real user match (with repeats) in pool #{@pool.name}, sequence #{@sequence.name}"
+
+    base_query = build_real_user_query_with_repeats
+    match_result = find_match_with_gender_preference_logic(base_query, 'real_user')
+
+    if match_result[:success]
+      return create_real_user_match(match_result[:match])
+    end
+
+    { success: false, reason: 'No real users available (even with repeats)' }
+  end
+
+  # NEW: Staff matching methods
+  def find_staff_match_no_repeats
+    return { success: false, reason: 'Staff users cannot match with other staff' } if @user.role == 'staff'
+
+    Rails.logger.info "👨‍💼 Looking for staff match (no repeats) for app user #{@user_id}"
+
+    base_query = build_staff_query_no_repeats
+    match_result = find_match_with_gender_preference_logic(base_query, 'staff')
+
+    if match_result[:success]
+      return create_staff_match(match_result[:match])
+    end
+
+    { success: false, reason: 'No staff available (no repeats)' }
+  end
+
+  def find_staff_match_with_repeats
+    return { success: false, reason: 'Staff users cannot match with other staff' } if @user.role == 'staff'
+
+    Rails.logger.info "👨‍💼 Looking for staff match (with repeats) for app user #{@user_id}"
+
+    base_query = build_staff_query_with_repeats
+    match_result = find_match_with_gender_preference_logic(base_query, 'staff')
+    if match_result[:success]
+      return create_staff_match(match_result[:match])
+    end
+
+    { success: false, reason: 'No staff available (even with repeats)' }
+  end
+
+  # NEW: Video matching methods
+  def find_video_match_no_repeats
+    return { success: false, reason: 'Staff users do not watch videos' } if @user.role == 'staff'
+
+    Rails.logger.info "🎥 Looking for video match (no repeats) for app user #{@user_id}"
+
+    # Check if user should see video next based on sequence logic
+    should_show = should_show_video_next?
+    return { success: false, reason: 'should_show_video_next returned false' } unless should_show
+
+    # Get next available video user hasn't seen
+    available_video = get_next_video_for_user_no_repeats
+    return { success: false, reason: 'No available video found (no repeats)' } unless available_video
+
+    create_video_match(available_video)
+  end
+
+  def find_video_match_with_repeats
+    return { success: false, reason: 'Staff users do not watch videos' } if @user.role == 'staff'
+
+    Rails.logger.info "🎥 Looking for video match (with repeats) for app user #{@user_id}"
+
+    # Check if user should see video next based on sequence logic
+    should_show = should_show_video_next?
+    return { success: false, reason: 'should_show_video_next returned false' } unless should_show
+
+    # Get any available video (including repeats)
+    available_video = get_next_video_for_user_with_repeats
+    return { success: false, reason: 'No available video found (even with repeats)' } unless available_video
+
+    create_video_match(available_video)
+  end
+
+  def create_video_match(available_video)
+    room_id = create_room_id
+    Rails.logger.info "🎥 Creating room #{room_id} for video #{available_video.id}"
+    session_version = generate_session_version(room_id)
+
+    match_users_in_room(@waiting_entry, nil, room_id, 'video', session_version, nil, available_video.id)
+
+    Rails.logger.info "✅ User #{@user_id} matched with video #{available_video.id} in sequence #{@sequence.name}"
+
+    # Increment video count after successful match
+    increment_video_count_after_match
+
+    # Get video URL for frontend
+    video_url = nil
+    if available_video.video_file.attached?
+      video_url = available_video.video_file.url
+      Rails.logger.info "🎥 Video URL generated: #{video_url}"
+    else
+      Rails.logger.warn "🎥 Video file not attached for video #{available_video.id}"
+    end
+
+    {
+      success: true,
+      match_type: 'video',
+      video_id: available_video.id,
+      video_url: video_url,
+      video_name: available_video.name,
+      room_id: room_id,
+      session_version: session_version,
+      is_initiator: true
+    }
+  end
+
+  def build_real_user_query_no_repeats
+    build_base_user_query
+      .where(match_type: 'real_user')
+      .where.not(users: { id: recently_disconnected_users })
+      .where.not(users: { id: users_matched_recently })
+      .order(:joined_at)
+  end
+
+  def build_real_user_query_with_repeats
+    # For repeats, we want to prioritize users based on when they were first matched
+    # This ensures we get the earliest repeat (e.g., user7 at 7:20 before user8 at 7:25)
+
+    # Get users matched recently, ordered by first match time
+    recently_matched_users = VideoChatSession.where(
+      user_id: @user_id,
+      created_at: 10.minutes.ago..Time.current,
+      status: ['active', 'completed']
+    ).order(:created_at).pluck(:partner_user_id).compact
+
+    Rails.logger.info "🔄 Repeat matching: Found #{recently_matched_users.count} recently matched users: #{recently_matched_users}"
+
+    # Build base query excluding recently disconnected users
+    base_query = build_base_user_query
+      .where(match_type: 'real_user')
+      .where.not(users: { id: recently_disconnected_users })
+
+    # If we have recently matched users, prioritize them by match order
+    if recently_matched_users.any?
+      # Use CASE statement to order by match priority (earliest first)
+      order_clause = recently_matched_users.map.with_index { |user_id, index|
+        "CASE WHEN users.id = #{user_id} THEN #{index} ELSE #{recently_matched_users.length} END"
+      }.join(', ')
+
+      base_query = base_query.joins(:user)
+                             .order(Arel.sql(order_clause))
+                             .order(:joined_at) # Secondary sort by join time
+
+      Rails.logger.info "🔄 Repeat matching: Prioritizing users by match order: #{recently_matched_users}"
+    else
+      # No recent matches, use default ordering
+      base_query = base_query.joins(:user).order(:joined_at)
+      Rails.logger.info "🔄 Repeat matching: No recent matches, using default ordering"
+    end
+
+    base_query
+  end
+
+  def build_staff_query_no_repeats
+    # Staff can only be in ONE session at a time
+    # Check if staff user is already in an active session
+    Rails.logger.info "🔍 Building staff query (no repeats) for pool #{@pool.id}, sequence #{@sequence.id}"
+
+    query = VideoWaitingRoom.where(match_type: 'staff')
+                            .where(status: 'waiting')
+                            .where(pool_id: @pool.id)
+                            .where(sequence_id: @sequence.id)
+                            .where.not(user_id: @user_id)
+                            .where.not(user_id: recently_disconnected_users)
+                            .where.not(user_id: staff_matched_recently)
+                            .where(session_version: nil)
+                            .joins(:user)
+                            .order(:joined_at)
+
+    staff_count = query.count
+    Rails.logger.info "🔍 Found #{staff_count} available staff users for matching (no repeats)"
+
+    query
+  end
+
+  def build_staff_query_with_repeats
+    # Staff can only be in ONE session at a time
+    # Check if staff user is already in an active session
+    Rails.logger.info "🔍 Building staff query (with repeats) for pool #{@pool.id}, sequence #{@sequence.id}"
+
+    query = VideoWaitingRoom.where(match_type: 'staff')
+                            .where(status: 'waiting')
+                            .where(pool_id: @pool.id)
+                            .where(sequence_id: @sequence.id)
+                            .where.not(user_id: @user_id)
+                            .where.not(user_id: recently_disconnected_users)
+                            .where(session_version: nil)
+                            .joins(:user)
+                            .order(:joined_at)
+
+    staff_count = query.count
+    Rails.logger.info "🔍 Found #{staff_count} available staff users for matching (with repeats)"
+
+    query
+  end
+
+  # NEW: Helper methods for repeat avoidance
+  def users_matched_recently
+    VideoChatSession.where(
+      user_id: @user_id,
+      created_at: 10.minutes.ago..Time.current,
+      status: ['active', 'completed']
+    ).pluck(:partner_user_id).compact
+  end
+
+  def staff_matched_recently
+    VideoChatSession.where(
+      user_id: @user_id,
+      session_type: 'user_to_staff',
+      created_at: 10.minutes.ago..Time.current,
+      status: ['active', 'completed']
+    ).pluck(:partner_user_id).compact
+  end
+
+  def check_and_advance_sequence_if_needed
+    return unless @user && @sequence
+
+    # Get current video count from user
+    current_video_count = @user.videos_watched_in_current_sequence || 0
+
+    # Check if sequence should advance
+    if current_video_count >= @sequence.video_count
+      Rails.logger.info "🔄 Video count threshold reached! Advancing sequence for user #{@user_id}"
+      advance_to_next_sequence
+    else
+      Rails.logger.info "📊 Current video count: #{current_video_count}, threshold: #{@sequence.video_count}, sequence continues"
+    end
+  end
+
+  # Increment video count after successful match completion
+  def increment_video_count_after_match
+    return unless @user && @sequence
+
+    Rails.logger.info "📊 Incrementing video count for user #{@user_id} in sequence #{@sequence.name}"
+
+    # Get current video count from user
+    current_video_count = @user.videos_watched_in_current_sequence || 0
+    new_video_count = current_video_count + 1
+
+    Rails.logger.info "📊 Current video count: #{current_video_count}, New count: #{new_video_count}, Threshold: #{@sequence.video_count}"
+
+    # Update user's video count
+    @user.update!(videos_watched_in_current_sequence: new_video_count)
+
+    Rails.logger.info "📊 Video count updated to #{new_video_count} for sequence #{@sequence.name}"
   end
 end
