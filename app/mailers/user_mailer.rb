@@ -18,6 +18,7 @@ class UserMailer < ApplicationMailer
       "from": "Juicy Meets <onboarding@resend.dev>",
       "to": [user.email],
       "subject": "Welcome to Juicy Meets - Your Password"
+      "html": render_to_string(template: 'user_mailer/password_email')
     })
   end
 
@@ -28,7 +29,8 @@ class UserMailer < ApplicationMailer
     Resend::Emails.send({
       "from": "Juicy Meets <onboarding@resend.dev>",
       "to": [user.email],
-      "subject": "Juicy Meets - Your New Password"
+      "subject": "Juicy Meets - Your New Password",
+      "html": render_to_string(template: 'user_mailer/forgot_password_email')
     })
   end
 end
