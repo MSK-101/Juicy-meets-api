@@ -224,31 +224,43 @@ class Api::V1::VideoChatController < ApplicationController
   # User leaves the video chat
   def leave
     user_id = current_user.id
-    waiting_entry = VideoWaitingRoom.find_by(user_id: user_id)
 
-    if waiting_entry
+    Rails.logger.info "👋 User #{user_id} leaving video chat"
+
+    # Use the pool matching service for proper cleanup
+    matching_service = PoolMatchingService.new(user_id)
+
+    # Clean up any stale room assignments first
+    matching_service.cleanup_stale_room_assignments
+
+    # Handle room disconnection if user is in a room
+    matching_service.handle_room_disconnection
+
+    # Find and clean up all waiting room entries for this user
+    waiting_entries = VideoWaitingRoom.where(user_id: user_id)
+
+    waiting_entries.each do |waiting_entry|
       if waiting_entry.room_id.present?
         # End the current session
         end_current_session(waiting_entry.room_id, user_id)
 
-        # User was in a chat, notify partner
-        ActionCable.server.broadcast(
-          "video_chat_#{waiting_entry.room_id}",
-          {
-            type: 'user_left',
-            user_id: user_id
-          }
-        )
-
-        # Also clean up partner's waiting room entry
-        if waiting_entry.partner_user_id
-          partner_entry = VideoWaitingRoom.find_by(user_id: waiting_entry.partner_user_id)
-          partner_entry&.destroy
-        end
+        Rails.logger.info "✅ Ended session for room #{waiting_entry.room_id}"
       end
 
+      # Destroy the waiting entry
       waiting_entry.destroy
+      Rails.logger.info "✅ Cleaned up waiting entry for user #{user_id}"
     end
+
+    # Also clean up any VideoChatSessions that might be active
+    active_sessions = VideoChatSession.where(user_id: user_id, status: 'active')
+    active_sessions.update_all(
+      status: 'completed',
+      ended_at: Time.current,
+      end_reason: 'user_left'
+    )
+
+    Rails.logger.info "✅ User #{user_id} completely disconnected from video chat"
 
     render json: { status: 'left' }
   end

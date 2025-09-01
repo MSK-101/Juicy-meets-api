@@ -191,73 +191,65 @@ class PoolMatchingService
     room_id = @waiting_entry.room_id
     Rails.logger.info "🔄 User #{@user_id} swiping from room #{room_id}, handling disconnection"
 
-    # Find all users in this room
-    users_in_room = VideoWaitingRoom.where(room_id: room_id)
+    # Use database transaction to prevent race conditions
+    ActiveRecord::Base.transaction do
+      # Find all users in this room (without locking for count)
+      users_in_room = VideoWaitingRoom.where(room_id: room_id)
+      user_count = users_in_room.count
 
-    if users_in_room.count > 1
-      Rails.logger.info "🔄 Found #{users_in_room.count} users in room #{room_id}, disconnecting all"
+      if user_count > 1
+        # Now lock the actual records we'll be updating
+        users_in_room = users_in_room.lock
+        Rails.logger.info "🔄 Found #{user_count} users in room #{room_id}, disconnecting all"
 
-      # Disconnect all users from this room
-      users_in_room.each do |user_entry|
-        Rails.logger.info "🔄 Disconnecting user #{user_entry.user_id} from room #{room_id}"
+        # Disconnect all users from this room
+        users_in_room.each do |user_entry|
+          next if user_entry.user_id == @user_id # Skip current user, handle separately
 
-        # Handle staff disconnection differently
-        if user_entry.user.role == 'staff'
-          user_entry.update!(
-            room_id: nil,
-            partner_user_id: nil,
-            status: 'waiting',
-            match_type: 'staff',
-            session_version: nil
-          )
-          Rails.logger.info "✅ Staff user #{user_entry.user_id} reset to waiting status"
-        else
-          # Reset their waiting entry for new matching
-          user_entry.update!(
-            room_id: nil,
-            partner_user_id: nil,
-            status: 'waiting',
-            match_type: 'real_user',
-            session_version: nil  # Clear session version to prevent stale connections
-          )
-          Rails.logger.info "✅ Real user #{user_entry.user_id} reset to waiting status"
-        end
+          Rails.logger.info "🔄 Disconnecting user #{user_entry.user_id} from room #{room_id}"
 
-        # Trigger new match finding for the other user (not the current user)
-        if user_entry.user_id != @user_id
-          Rails.logger.info "🔄 Triggering new match for user #{user_entry.user_id}"
+          # Reset partner's entry and set them back to waiting
+          reset_user_to_waiting_state(user_entry)
+
+          # IMPORTANT: Trigger immediate match finding to prevent user being stuck
+          # This ensures they get a new match right away instead of waiting
+          Rails.logger.info "🔄 Triggering immediate match for disconnected user #{user_entry.user_id}"
           trigger_new_match_for_user(user_entry.user_id)
         end
       end
-    else
-      Rails.logger.info "🔄 Only one user in room #{room_id}, cleaning up current user only"
+
+      # Clean up current user's entry
+      reset_user_to_waiting_state(@waiting_entry)
+      Rails.logger.info "✅ Current user #{@user_id} reset to waiting status"
+
+      # Mark this room as recently disconnected to prevent immediate reuse
+      mark_room_as_recently_disconnected(room_id)
     end
 
-    # Clean up current user's entry
-    if @user.role == 'staff'
-      @waiting_entry.update!(
+    Rails.logger.info "✅ Room #{room_id} disconnection completed for user #{@user_id}"
+  end
+
+  # Helper method to reset user to waiting state consistently
+  def reset_user_to_waiting_state(user_entry)
+    if user_entry.user.role == 'staff'
+      user_entry.update!(
         room_id: nil,
         partner_user_id: nil,
         status: 'waiting',
         match_type: 'staff',
-        session_version: nil
+        session_version: nil,
+        updated_at: Time.current # Force timestamp update for status checks
       )
-      Rails.logger.info "✅ Current staff user #{@user_id} reset to waiting status"
     else
-      @waiting_entry.update!(
+      user_entry.update!(
         room_id: nil,
         partner_user_id: nil,
         status: 'waiting',
         match_type: 'real_user',
-        session_version: nil  # Clear session version to prevent stale connections
+        session_version: nil,
+        updated_at: Time.current # Force timestamp update for status checks
       )
-      Rails.logger.info "✅ Current real user #{@user_id} reset to waiting status"
     end
-
-    # Mark this room as recently disconnected to prevent immediate reuse
-    mark_room_as_recently_disconnected(room_id)
-
-    Rails.logger.info "✅ Room #{room_id} disconnection completed for user #{@user_id}"
   end
 
   # Check and clean up stale room assignments
@@ -641,8 +633,10 @@ class PoolMatchingService
                     .where(pool_id: @pool.id)
                     .where(sequence_id: @sequence.id)
                     .where(room_id: nil)
+                    .where(session_version: nil) # Only match users with no active session
                     .where.not(users: { id: users_in_active_sessions })
                     .where.not(users: { id: recently_disconnected_users })  # Prevent matching with recently disconnected users
+                    # .where('video_waiting_rooms.updated_at > ?', 5.minutes.ago) # Only match recently active users
   end
 
   # Get list of users who were recently disconnected from the same room
@@ -854,9 +848,10 @@ class PoolMatchingService
                             .where(pool_id: @pool.id)
                             .where(sequence_id: @sequence.id)
                             .where.not(user_id: @user_id)
-                            .where(session_version: nil)
+                            .where(room_id: nil) # Ensure staff is not in any room
+                            .where(session_version: nil) # Ensure no active session
+                            # .where('video_waiting_rooms.updated_at > ?', 5.minutes.ago) # Only recently active staff
                             .joins(:user)
-    # debugger
 
     staff_count = query.count
     Rails.logger.info "🔍 Found #{staff_count} available staff users for matching"
