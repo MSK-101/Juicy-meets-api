@@ -44,17 +44,7 @@ class User < ApplicationRecord
 
   # Send password email
   def send_password_email
-    user = User.find(8)
-    begin
-      UserMailer.password_email(user, password).deliver_now
-    rescue Resend::Error => e
-      puts "Resend Error Details:"
-      puts "  Message: #{e.message}"
-      puts "  Class: #{e.class}"
-      puts "  Response: #{e.response_body if e.respond_to?(:response_body)}"
-      puts "  Status: #{e.status_code if e.respond_to?(:status_code)}"
-      puts "  Full error: #{e.inspect}"
-    end
+    UserMailer.password_email(self, password).deliver_now
   end
 
   def pool_id

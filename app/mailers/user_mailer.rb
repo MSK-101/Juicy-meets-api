@@ -15,12 +15,32 @@ class UserMailer < ApplicationMailer
     Resend.api_key = ENV['RESEND_API_KEY']
     @user = user
     @password = password
-    Resend::Emails.send({
+
+    # Render HTML version with layout
+    html_content = render_to_string(
+      template: 'user_mailer/password_email',
+      layout: 'mailer',
+      formats: [:html]
+    )
+
+    # Render text version with layout
+    text_content = render_to_string(
+      template: 'user_mailer/password_email',
+      layout: 'mailer',
+      formats: [:text]
+    )
+
+    # Send via Resend API
+    result = Resend::Emails.send({
       "from": "Juicy Meets <onboarding@resend.dev>",
       "to": [user.email],
       "subject": "Welcome to Juicy Meets - Your Password",
-      "html": render_to_string(template: 'user_mailer/password_email')
+      "html": html_content,
+      "text": text_content
     })
+
+    Rails.logger.info "Password email sent successfully: #{result[:id]}"
+    result
   end
 
   def forgot_password_email(user, password)
@@ -29,11 +49,30 @@ class UserMailer < ApplicationMailer
     @user = user
     @password = password
 
-    Resend::Emails.send({
+    # Render HTML version with layout
+    html_content = render_to_string(
+      template: 'user_mailer/forgot_password_email',
+      layout: 'mailer',
+      formats: [:html]
+    )
+
+    # Render text version with layout
+    text_content = render_to_string(
+      template: 'user_mailer/forgot_password_email',
+      layout: 'mailer',
+      formats: [:text]
+    )
+
+    # Send via Resend API
+    result = Resend::Emails.send({
       "from": "Juicy Meets <onboarding@resend.dev>",
       "to": [user.email],
       "subject": "Juicy Meets - Your New Password",
-      "html": render_to_string(template: 'user_mailer/forgot_password_email')
+      "html": html_content,
+      "text": text_content
     })
+
+    Rails.logger.info "Forgot password email sent successfully: #{result[:id]}"
+    result
   end
 end
