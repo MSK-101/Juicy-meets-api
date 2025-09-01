@@ -311,7 +311,55 @@ class Api::V1::VideoChatController < ApplicationController
     # End the session
     end_current_session(room_id, user_id)
 
-    render json: { status: 'session_ended' }
+          render json: { status: 'session_ended' }
+  end
+
+  # POST /api/video_chat/clear_waiting_room
+  # Clear waiting room after successful WebRTC connection
+  def clear_waiting_room
+    user_id = current_user.id
+    room_id = params[:room_id]
+
+    unless room_id
+      render json: { error: 'Room ID required' }, status: :bad_request
+      return
+    end
+
+    Rails.logger.info "🧹 Clearing waiting room for room #{room_id} by user #{user_id}"
+
+    begin
+      # Find all waiting room entries for this room
+      waiting_entries = VideoWaitingRoom.where(room_id: room_id)
+
+      if waiting_entries.empty?
+        Rails.logger.warn "⚠️ No waiting room entries found for room #{room_id}"
+        render json: { success: false, message: 'No waiting room entries found' }
+        return
+      end
+
+      # Update status to 'completed' and add completion timestamp
+      waiting_entries.update_all(
+        status: 'completed',
+        completed_at: Time.current,
+        updated_at: Time.current
+      )
+
+      Rails.logger.info "✅ Successfully cleared waiting room for room #{room_id}. Updated #{waiting_entries.count} entries."
+
+      render json: {
+        success: true,
+        message: 'Waiting room cleared successfully',
+        room_id: room_id,
+        entries_updated: waiting_entries.count
+      }
+    rescue => e
+      Rails.logger.error "❌ Error clearing waiting room for room #{room_id}: #{e.message}"
+      render json: {
+        success: false,
+        error: 'Failed to clear waiting room',
+        message: e.message
+      }, status: :internal_server_error
+    end
   end
 
   private

@@ -60,6 +60,7 @@ Rails.application.routes.draw do
         post :leave          # Leave chat
         post :swipe          # Swipe to next match
         post :end_session    # End current session
+        post :clear_waiting_room # Clear waiting room after successful connection
         get :deduction_rules # Get active deduction rules
         post :apply_duration_deduction # Apply duration-based deductions
         get :user_balance    # Get user's current coin balance
