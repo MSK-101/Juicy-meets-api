@@ -8,7 +8,6 @@ class DeviseMailer < Devise::Mailer
 
     mail(
       to: @resource.email,
-      from: 'noreply@juicymeets.com',
       subject: 'Confirmation instructions',
       template_path: 'devise/mailer',
       template_name: 'confirmation_instructions'
