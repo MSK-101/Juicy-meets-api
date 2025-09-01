@@ -60,3 +60,9 @@ group :development, :test do
   # Letter Opener for viewing emails in browser during development
   gem "letter_opener"
 end
+
+# SendGrid for production email delivery
+gem "sendgrid-ruby"
+
+# Environment variable management
+gem "figaro"
