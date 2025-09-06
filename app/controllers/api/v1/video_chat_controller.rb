@@ -276,6 +276,10 @@ class Api::V1::VideoChatController < ApplicationController
       return
     end
 
+    if waiting_entry.room_id.present?
+      end_current_session(waiting_entry.room_id, user_id)
+    end
+
     # Try to find next match (service will handle room cleanup automatically)
     matching_service = PoolMatchingService.new(user_id)
     match_result = matching_service.find_next_match

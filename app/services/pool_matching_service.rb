@@ -463,7 +463,6 @@ class PoolMatchingService
       sequence_id: @sequence&.id,
       session_id: generate_session_id,
       started_at: Time.current,
-      # Use session_type instead of match_type
       session_type: session_type,
       partner_user_id: match_data[:partner_id],
       room_id: match_data[:room_id],
@@ -484,7 +483,6 @@ class PoolMatchingService
         video_id: match_data[:video_id]
       )
     end
-
     VideoChatSession.create!(session_attributes)
   end
 

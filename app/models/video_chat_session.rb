@@ -13,10 +13,6 @@ class VideoChatSession < ApplicationRecord
   validates :status, inclusion: { in: %w[active completed disconnected] }
   validates :duration_seconds, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
 
-  # Enums
-  enum session_type: { user_to_user: 0, user_to_staff: 1, user_to_video: 2 }
-  enum status: { active: 0, completed: 1, disconnected: 2 }
-
   # Scopes
   scope :active, -> { where(status: 'active') }
   scope :completed, -> { where(status: 'completed') }
@@ -36,18 +32,15 @@ class VideoChatSession < ApplicationRecord
 
     self.duration_seconds = ((Time.current - created_at) / 1.second).round
     self.ended_at = Time.current
+    self.status = 'completed'
 
     case session_type
     when 'user_to_user'
-      self.status = 'completed'
     when 'user_to_staff'
-      self.status = 'completed'
       update_staff_metrics
     when 'user_to_video'
-      self.status = 'completed'
       update_video_metrics
     end
-
     save!
   end
 
@@ -59,6 +52,15 @@ class VideoChatSession < ApplicationRecord
     self.status = 'disconnected'
     save!
   end
+
+  def completed?
+    status == 'completed'
+  end
+
+  def disconnected?
+    status == 'disconnected'
+  end
+
 
   def is_staff_session?
     user_to_staff?
@@ -140,11 +142,6 @@ class VideoChatSession < ApplicationRecord
     duration = Time.current - self.started_at
 
     # Update session with end data
-    self.update!(
-      ended_at: Time.current,
-      duration_seconds: duration.to_i,
-      end_reason: 'swiped',
-      status: 'completed'
-    )
+    self.update!( ended_at: Time.current, duration_seconds: duration.to_i, status: 'completed')
   end
 end
