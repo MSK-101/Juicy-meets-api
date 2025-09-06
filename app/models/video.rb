@@ -1,6 +1,7 @@
 class Video < ApplicationRecord
   # Enums
   has_one_attached :video_file
+  has_many :video_chat_sessions, dependent: :destroy
   enum gender: { male: 0, female: 1, other: 2 }
   enum status: { active: 0, pending: 1, inactive: 2 }
 
@@ -24,6 +25,10 @@ class Video < ApplicationRecord
   # Instance methods
   def display_name
     "#{name} (#{gender.humanize})"
+  end
+
+  def total_chat_sessions
+    video_chat_sessions.count
   end
 
   def to_s

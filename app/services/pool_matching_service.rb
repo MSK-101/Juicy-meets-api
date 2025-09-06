@@ -567,7 +567,7 @@ class PoolMatchingService
     Rails.logger.info "🔚 Session #{session.session_id} ended for user #{@user_id}, duration: #{duration.to_i}s, reason: #{reason}"
 
     # Increment video count and check sequence advancement after successful match
-    increment_video_count_and_check_sequence_advancement if session.session_type == 'user_to_user'
+    # increment_video_count_and_check_sequence_advancement if session.session_type == 'user_to_user'
 
     # Return session data for potential analytics
     {
@@ -601,7 +601,7 @@ class PoolMatchingService
   private
 
   # Helper method to update user's sequence information
-  def update_user_sequence_info(sequence, reset_video_count: false)
+  def update_user_sequence_info(sequence, reset_video_count: true)
     update_attributes = {
       sequence_id: sequence.id,
       sequence_total_videos: sequence.video_count
@@ -1006,7 +1006,7 @@ class PoolMatchingService
     current_position = @sequence.position
 
     # Find next sequence
-    next_sequence = active_sequences.find { |seq| seq.position > current_position }
+    next_sequence = active_sequences.find { |seq| seq.position > current_position && seq.videos.active.any? }
 
     if next_sequence
       Rails.logger.info "🔄 Next sequence found: #{next_sequence.name} (position #{next_sequence.position})"
@@ -1064,17 +1064,51 @@ class PoolMatchingService
   def get_next_video_for_user_no_repeats
     return nil unless @sequence
 
-    # Get any available video from current sequence
-    videos = @sequence.videos.active
-    videos.first
+    # Get videos that user hasn't watched yet (no video chat sessions with these videos)
+    watched_video_ids = @user.watched_video_ids_in_sequence(@sequence.id)
+    unwatched_videos = @sequence.videos.active.where.not(id: watched_video_ids).order(:created_at)
+
+    unwatched_videos.first
   end
 
   def get_next_video_for_user_with_repeats
     return nil unless @sequence
+    return nil unless @sequence.videos.active.any?
 
-    # Get any available video from current sequence
-    videos = @sequence.videos.active
-    videos.first
+    # First try to get videos that user hasn't watched yet (reuse existing method)
+    unwatched_video = get_next_video_for_user_no_repeats
+    return unwatched_video if unwatched_video
+
+    # If all videos have been watched, implement rotation logic to avoid consecutive repeats
+    get_next_video_in_rotation
+  end
+
+  private
+
+  # Get the next video in rotation to avoid consecutive repeats
+  def get_next_video_in_rotation
+    all_videos = @sequence.videos.active.order(:created_at).to_a
+
+    # If only one video, return it
+    return all_videos.first if all_videos.size == 1
+
+    # Get the most recently watched video (last session created)
+    last_watched_video = @user.video_chat_sessions
+      .where(sequence_id: @sequence.id)
+      .joins(:video)
+      .where(videos: { status: :active })
+      .order(created_at: :desc)
+      .first&.video
+
+    if last_watched_video
+      # Find the next video in rotation (after the last watched one)
+      current_index = all_videos.find_index { |v| v.id == last_watched_video.id }
+      next_index = current_index ? (current_index + 1) % all_videos.size : 0
+      all_videos[next_index]
+    else
+      # If no previous session, return the oldest video
+      all_videos.first
+    end
   end
 
   def create_real_user_match(other_user)

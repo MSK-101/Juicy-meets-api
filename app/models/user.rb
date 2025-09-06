@@ -11,6 +11,7 @@ class User < ApplicationRecord
   has_many :coin_transactions, dependent: :destroy
   has_one :staff_assignment, dependent: :destroy
   has_many :user_ip_addresses, dependent: :destroy
+  has_many :video_chat_sessions, dependent: :destroy
 
   # Validations
   validates :email, presence: true, uniqueness: true
@@ -36,6 +37,12 @@ class User < ApplicationRecord
   scope :pool_c, -> { where('coin_balance = 0') }
   scope :online, -> { where(status: [:online, :in_chat]) }
   scope :available_staff, -> { staff.online.where.not(status: [:in_chat, :busy]) }
+
+  # Video chat session scopes
+  scope :with_video_sessions_in_sequence, ->(sequence_id) {
+    joins(:video_chat_sessions)
+    .where(video_chat_sessions: { sequence_id: sequence_id })
+  }
 
   # Generate random password for new users
   def self.generate_random_password
@@ -234,6 +241,23 @@ class User < ApplicationRecord
 
   def update_activity
     update!(last_activity_at: Time.current)
+  end
+
+  # Get watched video IDs in a specific sequence
+  def watched_video_ids_in_sequence(sequence_id)
+    video_chat_sessions.where(sequence_id: sequence_id).pluck(:video_id).uniq
+  end
+
+  # Get video with oldest chat session in a specific sequence
+  def video_with_oldest_session_in_sequence(sequence_id)
+    oldest_session = video_chat_sessions
+      .where(sequence_id: sequence_id)
+      .joins(:video)
+      .where(videos: { status: :active })
+      .order(:created_at)
+      .first
+
+    oldest_session&.video
   end
 
   private

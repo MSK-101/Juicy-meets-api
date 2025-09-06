@@ -137,8 +137,14 @@ class VideoChatSession < ApplicationRecord
 
   def update_video_metrics
     return unless video_id.present?
+    duration = Time.current - self.started_at
 
-    # Update video view count or other metrics
-    video.increment!(:view_count) if video.respond_to?(:view_count)
+    # Update session with end data
+    self.update!(
+      ended_at: Time.current,
+      duration_seconds: duration.to_i,
+      end_reason: 'swiped',
+      status: 'completed'
+    )
   end
 end

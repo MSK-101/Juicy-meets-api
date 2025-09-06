@@ -323,7 +323,7 @@ class Api::V1::VideoChatController < ApplicationController
     # End the session
     end_current_session(room_id, user_id)
 
-          render json: { status: 'session_ended' }
+    render json: { status: 'session_ended' }
   end
 
   # POST /api/video_chat/clear_waiting_room
