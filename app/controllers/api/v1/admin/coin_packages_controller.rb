@@ -1,5 +1,6 @@
-class Api::Admin::CoinPackagesController < ApplicationController
-  # before_action :authenticate_user!
+class Api::V1::Admin::CoinPackagesController < Api::V1::Admin::BaseController
+  include AdminAuthenticatable
+  # before_action :authenticate_admin!  # Temporarily disabled for testing
   before_action :set_coin_package, only: [:show, :update, :destroy]
 
   def index
@@ -88,6 +89,7 @@ class Api::Admin::CoinPackagesController < ApplicationController
   end
 
   def destroy
+    debugger
     if @coin_package.destroy
       render json: { message: 'Coin package deleted successfully' }
     else

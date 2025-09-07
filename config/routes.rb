@@ -134,6 +134,12 @@ Rails.application.routes.draw do
             get :filters
           end
         end
+
+        # Coin packages and monetization routes
+        resources :coin_packages
+        get :monetization, to: 'monetization#index'
+        get 'monetization/transactions', to: 'monetization#transactions'
+        get 'monetization/stats', to: 'monetization#stats'
       end
     end
   end
@@ -142,7 +148,6 @@ Rails.application.routes.draw do
   namespace :api do
     namespace :admin do
       get :dashboard, to: 'dashboard#index'
-      resources :coin_packages
     end
   end
 

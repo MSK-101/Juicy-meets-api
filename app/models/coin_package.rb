@@ -1,8 +1,9 @@
 class CoinPackage < ApplicationRecord
   # Associations
-  has_many :user_coin_purchases, dependent: :restrict_with_error
-  has_many :coin_transactions, dependent: :restrict_with_error
-  has_many :users, through: :user_coin_purchases
+  # has_many :user_coin_purchases, dependent: :restrict_with_error
+  # has_many :coin_transactions, dependent: :restrict_with_error
+  # has_many :users, through: :user_coin_purchases
+  has_many :purchases, dependent: :destroy
 
   # Validations
   validates :name, presence: true, length: { maximum: 100 }
