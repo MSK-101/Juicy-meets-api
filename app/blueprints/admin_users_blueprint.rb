@@ -8,15 +8,30 @@ class AdminUsersBlueprint < Blueprinter::Base
   end
 
   field :coinPurchased do |user|
-    user.purchases.completed.sum(:coins_count)
+    begin
+      user.purchases.completed.sum(:coins_count) || 0
+    rescue => e
+      Rails.logger.error "Error calculating coinPurchased for user #{user.id}: #{e.message}"
+      0
+    end
   end
 
   field :deposits do |user|
-    user.purchases.completed.count
+    begin
+      user.purchases.completed.count
+    rescue => e
+      Rails.logger.error "Error calculating deposits for user #{user.id}: #{e.message}"
+      0
+    end
   end
 
   field :totalSpent do |user|
-    user.purchases.completed.sum(:price)
+    begin
+      user.purchases.completed.sum(:price) || 0
+    rescue => e
+      Rails.logger.error "Error calculating totalSpent for user #{user.id}: #{e.message}"
+      0
+    end
   end
 
   field :lastLogin do |user|

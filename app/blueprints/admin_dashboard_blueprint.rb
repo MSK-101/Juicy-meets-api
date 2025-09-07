@@ -4,19 +4,19 @@ class AdminDashboardBlueprint < Blueprinter::Base
     begin
       total_duration = VideoChatSession.sum(:duration_seconds) || 0
       views_in_minutes = total_duration / 60.0
-      
+
       total_revenue = Purchase.completed.sum(:price) || 0
-      
+
       waiting_users = VideoWaitingRoom.waiting.count rescue 0
       active_sessions = VideoChatSession.active.count rescue 0
       active_users = waiting_users + active_sessions
-      
+
       paying_users_count = begin
         User.joins(:purchases).where(purchases: { payment_status: 'completed' }).distinct.count
       rescue
         0
       end
-      
+
       {
         views: views_in_minutes.round(2),
         revenue: total_revenue,
