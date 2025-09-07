@@ -11,8 +11,8 @@ class Api::V1::Admin::UsersController < Api::V1::Admin::BaseController
 
     # Start with regular users (not staff) who have transactions
     users_query = User.where(role: :user)
-                      .left_joins(:purchases, :coin_transactions)
-                      .where('purchases.id IS NOT NULL OR coin_transactions.id IS NOT NULL')
+                      # .left_joins(:purchases, :coin_transactions)
+                      # .where('purchases.id IS NOT NULL OR coin_transactions.id IS NOT NULL')
                       .distinct
                       .includes(:purchases, :coin_transactions)
 

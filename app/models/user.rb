@@ -11,8 +11,9 @@ class User < ApplicationRecord
   has_many :coin_transactions, dependent: :destroy
   has_one :staff_assignment, dependent: :destroy
   has_many :user_ip_addresses, dependent: :destroy
-  has_many :video_chat_sessions, dependent: :destroy
-
+  has_many :video_chat_sessions, dependent: :destroy, foreign_key: :user_id
+  has_many :staff_chat_sessions, dependent: :destroy, class_name: 'VideoChatSession', foreign_key: :staff_user_id
+  has_many :video_waiting_rooms, dependent: :destroy
   # Validations
   validates :email, presence: true, uniqueness: true
   validates :coin_balance, numericality: { greater_than_or_equal_to: 0 }
@@ -56,6 +57,10 @@ class User < ApplicationRecord
 
   def pool_id
     pool.id
+  end
+
+  def total_online_time
+    video_chat_sessions.sum(:duration_seconds)/60.00 || 0
   end
 
   # Free coin distribution logic
@@ -241,6 +246,14 @@ class User < ApplicationRecord
 
   def update_activity
     update!(last_activity_at: Time.current)
+  end
+
+  def active?
+    video_waiting_rooms.present? || video_chat_sessions.where(status: :active).present? || staff_chat_sessions.where(status: :active).present?
+  end
+
+  def status
+    active? ? :online : :offline
   end
 
   # Get watched video IDs in a specific sequence

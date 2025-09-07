@@ -31,6 +31,14 @@ class Video < ApplicationRecord
     video_chat_sessions.count
   end
 
+  def views
+    video_chat_sessions.sum(:duration_seconds) || 0
+  end
+
+  def views_in_minutes
+    (views / 60.0).round(2)
+  end
+
   def to_s
     display_name
   end

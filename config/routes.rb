@@ -128,6 +128,12 @@ Rails.application.routes.draw do
             get :stats
           end
         end
+        get :dashboard, to: 'dashboard#index'
+        resources :videos, only: [:index] do
+          collection do
+            get :filters
+          end
+        end
       end
     end
   end
