@@ -123,6 +123,11 @@ Rails.application.routes.draw do
             get :available
           end
         end
+        resources :users, only: [:index] do
+          collection do
+            get :stats
+          end
+        end
       end
     end
   end
