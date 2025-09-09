@@ -80,75 +80,98 @@ class PoolMatchingService
     { success: false, reason: 'No matches available after retries' }
   end
 
-  # NEW: Structured matching with proper priority order
+  # NEW: Content-based matching with sequence advancement
   def find_match_with_priority_order
-    Rails.logger.info "🎯 Using structured priority matching for user #{@user_id}"
+    Rails.logger.info "🎯 Using content-based matching for user #{@user_id}"
 
-    # PRIORITY 1: No repeats (avoid recent connections)
-    Rails.logger.info "🔍 Priority 1: Trying matches without repeats..."
-
-    # 1.1: Real user match (no repeats)
+    # For app users, try content-based matching with sequence advancement
     if @user.role != 'staff'
-      real_user_no_repeat = find_real_user_match_no_repeats
-      if real_user_no_repeat[:success]
-        Rails.logger.info "✅ Priority 1.1: Real user match (no repeats) successful!"
-        return real_user_no_repeat
+      return find_match_with_sequence_advancement
+    end
+
+    Rails.logger.info "❌ No matches available in any sequence"
+    { success: false, reason: 'No matches available in any sequence' }
+  end
+
+  # Find match with automatic sequence advancement and infinite loop protection
+  def find_match_with_sequence_advancement(max_sequence_attempts = 10)
+    Rails.logger.info "🔄 Starting sequence advancement matching (max #{max_sequence_attempts} attempts)"
+
+    initial_sequence_id = @sequence&.id
+    sequence_attempts = 0
+    visited_sequences = Set.new
+
+    while sequence_attempts < max_sequence_attempts
+      sequence_attempts += 1
+      Rails.logger.info "🔄 Sequence attempt #{sequence_attempts}/#{max_sequence_attempts} for user #{@user_id}"
+
+      # Check for infinite loop: if we've seen this sequence before, break
+      if visited_sequences.include?(@sequence&.id)
+        Rails.logger.warn "⚠️ Infinite loop detected! Already visited sequence #{@sequence&.id}, breaking..."
+        break
+      end
+
+      # Mark this sequence as visited
+      visited_sequences.add(@sequence&.id)
+
+      # Try to find match in current sequence
+      match_result = find_next_match_by_content_type
+      if match_result[:success]
+        Rails.logger.info "✅ Match found in sequence #{@sequence&.name} (ID: #{@sequence&.id})"
+        return match_result
+      end
+
+      # If no match found, advance to next sequence
+      Rails.logger.info "🔄 No match found in sequence #{@sequence&.name}, advancing to next sequence..."
+      if advance_to_next_sequence
+        Rails.logger.info "✅ Advanced to sequence: #{@sequence&.name} (ID: #{@sequence&.id})"
+      else
+        Rails.logger.info "❌ No more sequences available for advancement"
+        break
       end
     end
 
-    # 1.2: Staff match (no repeats) - only for app users
-    if @user.role != 'staff'
-      staff_no_repeat = find_staff_match_no_repeats
-      if staff_no_repeat[:success]
-        Rails.logger.info "✅ Priority 1.2: Staff match (no repeats) successful!"
-        return staff_no_repeat
-      end
-    end
-
-    # 1.3: Video match (no repeats) - only for app users
-    if @user.role != 'staff'
-      video_no_repeat = find_video_match_no_repeats
-      if video_no_repeat[:success]
-        Rails.logger.info "✅ Priority 1.3: Video match (no repeats) successful!"
-        return video_no_repeat
-      end
-    end
-
-    # PRIORITY 2: With repeats (fallback when no fresh matches)
-    Rails.logger.info "🔍 Priority 2: Trying matches with repeats (fallback)..."
-
-    # 2.1: Real user match (with repeats)
-    if @user.role != 'staff'
-      real_user_with_repeat = find_real_user_match_with_repeats
-      if real_user_with_repeat[:success]
-        Rails.logger.info "✅ Priority 2.1: Real user match (with repeats) successful!"
-        return real_user_with_repeat
-      end
-    end
-
-    # 2.2: Staff match (with repeats) - only for app users
-    if @user.role != 'staff'
-      staff_with_repeat = find_staff_match_with_repeats
-      if staff_with_repeat[:success]
-        Rails.logger.info "✅ Priority 2.2: Staff match (with repeats) successful!"
-        return staff_with_repeat
-      end
-    end
-
-    # 2.3: Video match (with repeats) - only for app users
-    if @user.role != 'staff'
-      video_with_repeat = find_video_match_with_repeats
-      if video_with_repeat[:success]
-        Rails.logger.info "✅ Priority 2.3: Video match (with repeats) successful!"
-        return video_with_repeat
-      end
-    end
-
-    Rails.logger.info "❌ No matches available in any priority level"
-    { success: false, reason: 'No matches available in any priority level' }
+    Rails.logger.warn "⚠️ Reached maximum sequence attempts (#{max_sequence_attempts}) or infinite loop detected"
+    { success: false, reason: 'No matches available after checking all sequences' }
   end
 
   # Find next match when user swipes or disconnects
+  def find_next_match_by_content_type
+    @sequence.content_type.each do |content_type|
+      Rails.logger.info "🔍 Trying content type: #{content_type}"
+
+      # Try no-repeat matching first
+      match_result = case content_type
+      when 'app_users'
+        find_real_user_match_no_repeats
+      when 'staff'
+        find_staff_match_no_repeats
+      when 'recorded_videos'
+        find_video_match_no_repeats
+      end
+
+      return match_result if match_result[:success]
+
+      # If no-repeat failed, try with repeats
+      Rails.logger.info "🔄 No-repeat match failed for #{content_type}, trying with repeats..."
+      match_result = case content_type
+      when 'app_users'
+        find_real_user_match_with_repeats
+      when 'staff'
+        find_staff_match_with_repeats
+      when 'recorded_videos'
+        find_video_match_with_repeats
+      end
+
+      return match_result if match_result[:success]
+    end
+
+    # If no matches found for any content type
+    Rails.logger.info "❌ No matches found for any content type in sequence #{@sequence.name}"
+    { success: false, reason: 'No matches available for current content types' }
+  end
+
+
   def find_next_match
     return { error: 'User not found' } unless @user
 
@@ -969,7 +992,7 @@ class PoolMatchingService
   end
 
   def advance_to_next_sequence
-    return unless @user && @pool
+    return false unless @user && @pool
 
     Rails.logger.info "🔄 Advancing sequence for user #{@user_id}"
 
@@ -979,17 +1002,22 @@ class PoolMatchingService
     if next_sequence
       # Update user's sequence and reset video count
       update_user_sequence_info(next_sequence, reset_video_count: true)
+      @sequence = next_sequence  # Update instance variable
 
       Rails.logger.info "✅ User #{@user_id} advanced to sequence #{next_sequence.name} (ID: #{next_sequence.id})"
+      return true
     else
       # No more sequences, wrap back to first sequence
       first_sequence = find_first_active_sequence
       if first_sequence
         update_user_sequence_info(first_sequence, reset_video_count: true)
+        @sequence = first_sequence  # Update instance variable
 
         Rails.logger.info "🔄 User #{@user_id} wrapped back to first sequence #{first_sequence.name} (ID: #{first_sequence.id})"
+        return true
       else
         Rails.logger.warn "⚠️ No active sequences found in pool #{@pool.name}"
+        return false
       end
     end
   end
