@@ -90,4 +90,35 @@ class CoinDeductionService
     Rails.logger.error "❌ Error getting user balance for user #{user_id}: #{e.message}"
     return { success: false, error: e.message }
   end
+
+  def self.apply_per_swipe_deduction(user_id, rule)
+    user = User.find(user_id)
+
+    # Check if user has sufficient coins
+    if user.coin_balance < rule.coins
+      Rails.logger.warn "⚠️ User #{user_id} has insufficient coins (#{user.coin_balance}) for per-swipe deduction (#{rule.coins})"
+      return { success: false, deducted: 0, new_balance: user.coin_balance, error: 'Insufficient coins for swipe' }
+    end
+
+    # Apply the deduction
+    new_balance = user.coin_balance - rule.coins
+    user.update!(coin_balance: new_balance)
+
+    Rails.logger.info "💰 Applied per-swipe deduction: #{rule.coins} coins for user #{user_id}. New balance: #{new_balance}"
+
+    {
+      success: true,
+      deducted: rule.coins,
+      new_balance: new_balance,
+      applied_rule: {
+        id: rule.id,
+        name: rule.name,
+        coins: rule.coins,
+        deduction_type: rule.deduction_type
+      }
+    }
+  rescue => e
+    Rails.logger.error "❌ Error applying per-swipe deduction for user #{user_id}: #{e.message}"
+    return { success: false, deducted: 0, new_balance: user.coin_balance, error: e.message }
+  end
 end

@@ -280,6 +280,9 @@ class Api::V1::VideoChatController < ApplicationController
       end_current_session(waiting_entry.room_id, user_id)
     end
 
+    # Apply per-swipe deduction if user has coins
+    swipe_deduction_result = apply_per_swipe_deduction(user_id)
+
     # Try to find next match (service will handle room cleanup automatically)
     matching_service = PoolMatchingService.new(user_id)
     match_result = matching_service.find_next_match
@@ -306,10 +309,15 @@ class Api::V1::VideoChatController < ApplicationController
         video_id: match_result[:video_id],
         video_url: match_result[:video_url],
         video_name: match_result[:video_name],
-        updated_user_info: updated_user_info
+        updated_user_info: updated_user_info,
+        swipe_deduction: swipe_deduction_result
       }
     else
-      render json: { status: 'waiting', message: match_result[:message] }
+      render json: {
+        status: 'waiting',
+        message: match_result[:message],
+        swipe_deduction: swipe_deduction_result
+      }
     end
   end
 
@@ -379,6 +387,31 @@ class Api::V1::VideoChatController < ApplicationController
   end
 
   private
+
+  def apply_per_swipe_deduction(user_id)
+    # Check if user has coins before applying deduction
+    user = User.find(user_id)
+    return { success: false, deducted: 0, new_balance: user.coin_balance, error: 'No coins available' } if user.coin_balance <= 0
+
+    # Find active per-swipe rule
+    per_swipe_rule = DeductionRule.active.per_swipe.first
+
+    return { success: false, deducted: 0, new_balance: user.coin_balance, error: 'No per-swipe rule configured' } unless per_swipe_rule
+
+    # Apply the deduction
+    result = CoinDeductionService.apply_per_swipe_deduction(user_id, per_swipe_rule)
+
+    if result[:success]
+      Rails.logger.info "💰 Applied per-swipe deduction: #{result[:deducted]} coins for user #{user_id}. New balance: #{result[:new_balance]}"
+    else
+      Rails.logger.warn "⚠️ Failed to apply per-swipe deduction for user #{user_id}: #{result[:error]}"
+    end
+
+    result
+  rescue => e
+    Rails.logger.error "❌ Error applying per-swipe deduction for user #{user_id}: #{e.message}"
+    { success: false, deducted: 0, new_balance: user.coin_balance, error: e.message }
+  end
 
   def end_current_session(room_id, user_id)
     # Find and end the current session

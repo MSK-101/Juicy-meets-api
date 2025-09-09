@@ -83,6 +83,6 @@ class Api::V1::Admin::DeductionRulesController < Api::V1::Admin::BaseController
   end
 
   def rule_params
-    params.require(:deduction_rule).permit(:name, :threshold_seconds, :coins, :active)
+    params.require(:deduction_rule).permit(:name, :threshold_seconds, :coins, :active, :deduction_type)
   end
 end

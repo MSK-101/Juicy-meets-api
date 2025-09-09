@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_08_31_162253) do
+ActiveRecord::Schema[7.2].define(version: 2025_09_09_213656) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -82,12 +82,14 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_31_162253) do
 
   create_table "deduction_rules", force: :cascade do |t|
     t.string "name"
-    t.integer "threshold_seconds", null: false
+    t.integer "threshold_seconds"
     t.integer "coins", null: false
     t.boolean "active", default: true, null: false
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
+    t.string "deduction_type", default: "duration", null: false
     t.index ["active"], name: "index_deduction_rules_on_active"
+    t.index ["deduction_type"], name: "index_deduction_rules_on_deduction_type"
     t.index ["threshold_seconds"], name: "index_deduction_rules_on_threshold_seconds", unique: true
   end
 
@@ -255,6 +257,8 @@ ActiveRecord::Schema[7.2].define(version: 2025_08_31_162253) do
     t.datetime "created_at", null: false
     t.datetime "updated_at", null: false
     t.string "session_version"
+    t.datetime "completed_at"
+    t.index ["completed_at"], name: "index_video_waiting_rooms_on_completed_at"
     t.index ["partner_user_id"], name: "index_video_waiting_rooms_on_partner_user_id"
     t.index ["pool_id", "status"], name: "index_video_waiting_rooms_on_pool_id_and_status"
     t.index ["pool_id"], name: "index_video_waiting_rooms_on_pool_id"
