@@ -79,6 +79,7 @@ class Api::V1::UsersController < ApplicationController
     # This endpoint validates if a JWT token is still valid
     # It's called without authentication to check token validity
     token = request.headers['Authorization']&.split(' ')&.last
+    email = params[:email]
 
     if token.blank?
       render json: { valid: false, message: 'No token provided' }, status: :unauthorized
@@ -100,17 +101,62 @@ class Api::V1::UsersController < ApplicationController
           message: 'Token is valid'
         }
       else
-        render json: {
-          valid: false,
-          message: 'Invalid token'
-        }, status: :unauthorized
+        # Token is invalid, but if email is provided, try to auto-login
+        if email.present?
+          user = User.find_by(email: email)
+          if user
+            # Auto-login the user and generate new token
+            sign_in(user)
+            new_token = request.env['warden-jwt_auth.token']
+
+            render json: {
+              valid: true,
+              user: user_response(user),
+              token: new_token,
+              message: 'Token was invalid but user auto-logged in successfully'
+            }
+          else
+            render json: {
+              valid: false,
+              message: 'Invalid token and user not found'
+            }, status: :unauthorized
+          end
+        else
+          render json: {
+            valid: false,
+            message: 'Invalid token'
+          }, status: :unauthorized
+        end
       end
     rescue => e
-      render json: {
-        valid: false,
-        message: 'Invalid or expired token',
-        error: e.message
-      }, status: :unauthorized
+      # If token validation fails and email is provided, try auto-login
+      if email.present?
+        user = User.find_by(email: email)
+        if user
+          # Auto-login the user and generate new token
+          sign_in(user)
+          new_token = request.env['warden-jwt_auth.token']
+
+          render json: {
+            valid: true,
+            user: user_response(user),
+            token: new_token,
+            message: 'Token was invalid but user auto-logged in successfully'
+          }
+        else
+          render json: {
+            valid: false,
+            message: 'Invalid or expired token and user not found',
+            error: e.message
+          }, status: :unauthorized
+        end
+      else
+        render json: {
+          valid: false,
+          message: 'Invalid or expired token',
+          error: e.message
+        }, status: :unauthorized
+      end
     end
   end
 
