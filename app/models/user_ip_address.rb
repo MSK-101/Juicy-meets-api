@@ -9,3 +9,4 @@ class UserIpAddress < ApplicationRecord
     exists?(ip_address: ip_address)
   end
 end
+

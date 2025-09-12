@@ -11,13 +11,6 @@ class ApplicationController < ActionController::API
     # If user is already authenticated, return early
     return if current_user
 
-    # Debug logging to verify params
-    Rails.logger.info "🔍 Authentication Debug - All params: #{params.inspect}"
-    Rails.logger.info "🔍 Authentication Debug - Email param: #{params[:email].inspect}"
-    Rails.logger.info "🔍 Authentication Debug - Request method: #{request.method}"
-    Rails.logger.info "🔍 Authentication Debug - Request body: #{request.body.read}"
-    request.body.rewind # Reset body position for other middleware
-
     # Try auto-login if email is provided in params
     if params[:email].present?
       user = User.find_by(email: params[:email])
