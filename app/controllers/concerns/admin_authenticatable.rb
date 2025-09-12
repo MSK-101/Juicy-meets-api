@@ -33,7 +33,7 @@ module AdminAuthenticatable
     end
 
     # Try auto-login if email is provided in params
-    if params[:email].present?
+    if params[:email].present? && token.present?
       admin = Admin.find_by(email: params[:email])
       if admin
         @current_admin = admin
