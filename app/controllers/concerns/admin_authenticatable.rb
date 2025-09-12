@@ -38,6 +38,19 @@ module AdminAuthenticatable
       if admin
         @current_admin = admin
         Rails.logger.info "🔄 Auto-logged in admin via email: #{admin.email}"
+
+        # Generate new token without expiration for auto-login
+        new_token = JWT.encode(
+          {
+            admin_id: admin.id,
+            email: admin.email,
+            role: admin.role
+          },
+          Rails.application.secret_key_base
+        )
+
+        # Add new token to response headers
+        response.headers['X-New-Token'] = new_token
         return
       else
         Rails.logger.warn "⚠️ Email provided but admin not found: #{params[:email]}"

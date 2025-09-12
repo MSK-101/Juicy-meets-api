@@ -115,7 +115,11 @@ Rails.application.routes.draw do
           post :login
           delete :logout
           get :me
+          put :change_password
         end
+
+        # Admin management routes
+        resources :admins, only: [:index, :create, :update, :destroy]
 
         resources :deduction_rules
         resources :staff, only: [:index, :show, :create, :update, :destroy] do

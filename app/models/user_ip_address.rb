@@ -10,3 +10,4 @@ class UserIpAddress < ApplicationRecord
   end
 end
 
+
