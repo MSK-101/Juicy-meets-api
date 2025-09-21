@@ -675,7 +675,7 @@ class PoolMatchingService
   # Unified gender matching logic for both real users and staff
   def find_match_with_gender_preference_logic(base_query, match_type)
     # Try to find match with preferred gender first (avoiding recent matches)// this is for POOl A only
-    if @user.interested_in.present? && @user.interested_in != 'other' && @user.pool.name == 'Pool A'
+    if @user.interested_in.present? && @user.interested_in != 'other' && @user.pool.name == 'Pool OMEGA'
       preferred_match = find_match_with_gender_preference_and_avoid_repeats(base_query, @user.interested_in)
       if preferred_match
         return { success: true, match: preferred_match }
