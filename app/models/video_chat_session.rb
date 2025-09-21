@@ -61,7 +61,6 @@ class VideoChatSession < ApplicationRecord
     status == 'disconnected'
   end
 
-
   def is_staff_session?
     user_to_staff?
   end

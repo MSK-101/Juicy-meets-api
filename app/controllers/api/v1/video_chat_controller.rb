@@ -38,7 +38,7 @@ class Api::V1::VideoChatController < ApplicationController
     )
 
     # Try to find a match using the pool matching service
-    matching_service = PoolMatchingService.new(user_id)
+    matching_service = PoolMatchingAdapter.new(user_id)
     match_result = matching_service.find_match
 
     if match_result[:success]
@@ -72,25 +72,17 @@ class Api::V1::VideoChatController < ApplicationController
     user_id = current_user.id
     waiting_entry = VideoWaitingRoom.find_by(user_id: user_id)
 
-    Rails.logger.info "🔍 Status check for user #{user_id}"
-    Rails.logger.info "🔍 Waiting entry: #{waiting_entry.inspect}"
-
     unless waiting_entry
-      Rails.logger.info "❌ No waiting entry found for user #{user_id}"
       render json: { status: 'not_in_queue' }
       return
     end
 
     if waiting_entry.room_id.present?
       # User has been matched - DO NOT call find_match again!
-      Rails.logger.info "✅ User #{user_id} already matched with room #{waiting_entry.room_id}, type: #{waiting_entry.match_type}"
-      Rails.logger.info "🔒 User is in active connection - returning current match status"
 
       # Get the user's actual role for proper match_type
       user = User.find(user_id)
       user_match_type = user.role == 'staff' ? 'staff' : 'real_user'
-
-      Rails.logger.info "🔍 User #{user_id} role: #{user.role}, returning match_type: #{user_match_type}"
 
       # Determine actual match type based on room's match_type and user roles
       actual_match_type = case waiting_entry.match_type
@@ -127,8 +119,7 @@ class Api::V1::VideoChatController < ApplicationController
     end
 
     # Check if we should try to find a match now
-    Rails.logger.info "🔄 No room_id yet, trying to find match for user #{user_id}"
-    matching_service = PoolMatchingService.new(user_id)
+    matching_service = PoolMatchingAdapter.new(user_id)
     match_result = matching_service.find_match
 
     if match_result[:success]
@@ -138,9 +129,6 @@ class Api::V1::VideoChatController < ApplicationController
       # Get the user's actual role for proper match_type
       user = User.find(user_id)
       user_match_type = user.role == 'staff' ? 'staff' : 'real_user'
-
-      Rails.logger.info "✅ Found match for user #{user_id}: #{match_result.inspect}"
-      Rails.logger.info "🔍 User #{user_id} role: #{user.role}, returning match_type: #{user_match_type}"
 
       render json: {
         status: 'matched',
@@ -159,7 +147,6 @@ class Api::V1::VideoChatController < ApplicationController
         video_name: match_result[:video_name]
       }
     else
-      Rails.logger.info "⏳ No match found for user #{user_id}: #{match_result[:message]}"
       render json: { status: 'waiting', message: match_result[:message] }
     end
   end
@@ -225,10 +212,8 @@ class Api::V1::VideoChatController < ApplicationController
   def leave
     user_id = current_user.id
 
-    Rails.logger.info "👋 User #{user_id} leaving video chat"
-
     # Use the pool matching service for proper cleanup
-    matching_service = PoolMatchingService.new(user_id)
+    matching_service = PoolMatchingAdapter.new(user_id)
 
     # Clean up any stale room assignments first
     matching_service.cleanup_stale_room_assignments
@@ -244,12 +229,10 @@ class Api::V1::VideoChatController < ApplicationController
         # End the current session
         end_current_session(waiting_entry.room_id, user_id)
 
-        Rails.logger.info "✅ Ended session for room #{waiting_entry.room_id}"
       end
 
       # Destroy the waiting entry
       waiting_entry.destroy
-      Rails.logger.info "✅ Cleaned up waiting entry for user #{user_id}"
     end
 
     # Also clean up any VideoChatSessions that might be active
@@ -259,8 +242,6 @@ class Api::V1::VideoChatController < ApplicationController
       ended_at: Time.current,
       end_reason: 'user_left'
     )
-
-    Rails.logger.info "✅ User #{user_id} completely disconnected from video chat"
 
     render json: { status: 'left' }
   end
@@ -284,7 +265,7 @@ class Api::V1::VideoChatController < ApplicationController
     swipe_deduction_result = apply_per_swipe_deduction(user_id)
 
     # Try to find next match (service will handle room cleanup automatically)
-    matching_service = PoolMatchingService.new(user_id)
+    matching_service = PoolMatchingAdapter.new(user_id)
     match_result = matching_service.find_next_match
 
     if match_result[:success]
@@ -349,14 +330,11 @@ class Api::V1::VideoChatController < ApplicationController
       return
     end
 
-    Rails.logger.info "🧹 Clearing waiting room for room #{room_id} by user #{user_id}"
-
     begin
       # Find all waiting room entries for this room
       waiting_entries = VideoWaitingRoom.where(room_id: room_id)
 
       if waiting_entries.empty?
-        Rails.logger.warn "⚠️ No waiting room entries found for room #{room_id}"
         render json: { success: false, message: 'No waiting room entries found' }
         return
       end
@@ -368,8 +346,6 @@ class Api::V1::VideoChatController < ApplicationController
         updated_at: Time.current
       )
 
-      Rails.logger.info "✅ Successfully cleared waiting room for room #{room_id}. Updated #{waiting_entries.count} entries."
-
       render json: {
         success: true,
         message: 'Waiting room cleared successfully',
@@ -377,7 +353,6 @@ class Api::V1::VideoChatController < ApplicationController
         entries_updated: waiting_entries.count
       }
     rescue => e
-      Rails.logger.error "❌ Error clearing waiting room for room #{room_id}: #{e.message}"
       render json: {
         success: false,
         error: 'Failed to clear waiting room',
@@ -389,28 +364,41 @@ class Api::V1::VideoChatController < ApplicationController
   private
 
   def apply_per_swipe_deduction(user_id)
-    # Check if user has coins before applying deduction
+    # Optimized: Check if user has coins before applying deduction
     user = User.find(user_id)
-    return { success: false, deducted: 0, new_balance: user.coin_balance, error: 'No coins available' } if user.coin_balance <= 0
+
+    if user.coin_balance <= 0
+      return {
+        success: true,
+        deducted: 0,
+        new_balance: user.coin_balance,
+        error: 'No coins available',
+        no_coins: true
+      }
+    end
 
     # Find active per-swipe rule
     per_swipe_rule = DeductionRule.active.per_swipe.first
 
-    return { success: false, deducted: 0, new_balance: user.coin_balance, error: 'No per-swipe rule configured' } unless per_swipe_rule
+    unless per_swipe_rule
+      return {
+        success: true,
+        deducted: 0,
+        new_balance: user.coin_balance,
+        error: 'No per-swipe rule configured'
+      }
+    end
 
     # Apply the deduction
     result = CoinDeductionService.apply_per_swipe_deduction(user_id, per_swipe_rule)
 
     if result[:success]
-      Rails.logger.info "💰 Applied per-swipe deduction: #{result[:deducted]} coins for user #{user_id}. New balance: #{result[:new_balance]}"
     else
-      Rails.logger.warn "⚠️ Failed to apply per-swipe deduction for user #{user_id}: #{result[:error]}"
     end
 
     result
   rescue => e
-    Rails.logger.error "❌ Error applying per-swipe deduction for user #{user_id}: #{e.message}"
-    { success: false, deducted: 0, new_balance: user.coin_balance, error: e.message }
+    { success: false, deducted: 0, new_balance: user&.coin_balance || 0, error: e.message }
   end
 
   def end_current_session(room_id, user_id)
@@ -423,7 +411,6 @@ class Api::V1::VideoChatController < ApplicationController
 
     if session
       session.end_session
-      Rails.logger.info "✅ Session #{session.session_id} ended for user #{user_id}"
     end
   end
 
@@ -456,27 +443,20 @@ class Api::V1::VideoChatController < ApplicationController
       is_initiator: false
     )
 
-    Rails.logger.info "Matched users #{current_user_id} and #{other_waiting.user_id} in room #{room_id}"
-
     # Apply initial connection cost deduction for both users
     begin
       # Deduct 1 coin from current user
       current_deduction = CoinDeductionService.deduct_initial_connection_cost(current_user_id)
       if current_deduction[:success]
-        Rails.logger.info "💰 Initial connection cost deducted from user #{current_user_id}: #{current_deduction[:deducted]} coin"
       else
-        Rails.logger.warn "⚠️ Failed to deduct initial connection cost from user #{current_user_id}: #{current_deduction[:error]}"
       end
 
       # Deduct 1 coin from partner user
       partner_deduction = CoinDeductionService.deduct_initial_connection_cost(other_waiting.user_id)
       if partner_deduction[:success]
-        Rails.logger.info "💰 Initial connection cost deducted from user #{other_waiting.user_id}: #{partner_deduction[:deducted]} coin"
       else
-        Rails.logger.warn "⚠️ Failed to deduct initial connection cost from user #{other_waiting.user_id}: #{partner_deduction[:error]}"
       end
     rescue => e
-      Rails.logger.error "❌ Error applying initial connection deductions: #{e.message}"
     end
   end
 end

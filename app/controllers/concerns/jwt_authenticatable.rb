@@ -24,11 +24,9 @@ module JwtAuthenticatable
         return
       end
     rescue JWT::DecodeError => e
-      Rails.logger.error "JWT decode error: #{e.message}"
       render_unauthorized('Invalid authentication token')
       return
     rescue ActiveRecord::RecordNotFound => e
-      Rails.logger.error "User not found: #{e.message}"
       render_unauthorized('User not found')
       return
     end

@@ -10,24 +10,18 @@ module AdminAuthenticatable
     return if @current_admin
 
     token = extract_token_from_header
-    Rails.logger.info "Admin auth: Token extracted: #{token ? 'present' : 'missing'}"
-    Rails.logger.info "Admin auth: Authorization header: #{request.headers['Authorization']}"
 
     # Try to authenticate with token first
     if token
       begin
         decoded_token = JWT.decode(token, Rails.application.secret_key_base, true, { algorithm: 'HS256' })
         admin_data = decoded_token.first
-        Rails.logger.info "Admin auth: Decoded token data: #{admin_data}"
 
         @current_admin = Admin.find(admin_data['admin_id'])
-        Rails.logger.info "Admin auth: Admin found: #{@current_admin.email}"
         return
       rescue JWT::DecodeError => e
-        Rails.logger.error "Admin auth: JWT decode error: #{e.message}"
         # Token is invalid, try auto-login with email
       rescue ActiveRecord::RecordNotFound => e
-        Rails.logger.error "Admin auth: Admin not found: #{e.message}"
         # Admin not found, try auto-login with email
       end
     end
@@ -37,7 +31,6 @@ module AdminAuthenticatable
       admin = Admin.find_by(email: params[:email])
       if admin
         @current_admin = admin
-        Rails.logger.info "🔄 Auto-logged in admin via email: #{admin.email}"
 
         # Generate new token without expiration for auto-login
         new_token = JWT.encode(
@@ -53,10 +46,8 @@ module AdminAuthenticatable
         response.headers['X-New-Token'] = new_token
         return
       else
-        Rails.logger.warn "⚠️ Email provided but admin not found: #{params[:email]}"
       end
     else
-      Rails.logger.warn "⚠️ No email parameter provided for admin auto-login"
     end
 
     # If no admin found and no auto-login possible, return unauthorized

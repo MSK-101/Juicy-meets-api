@@ -49,8 +49,6 @@ class Api::V1::PurchasesController < ApplicationController
     params.require(:purchase).permit(:coin_package_id)
   end
 
-
-
   def purchase_response(purchase)
     {
       id: purchase.id,

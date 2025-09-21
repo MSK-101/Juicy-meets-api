@@ -16,7 +16,6 @@ class ApplicationController < ActionController::API
       user = User.find_by(email: params[:email])
       if user
         sign_in(user)
-        Rails.logger.info "🔄 Auto-logged in user via email: #{user.email}"
 
         # Get the new token from Devise JWT
         new_token = request.env['warden-jwt_auth.token']
@@ -26,10 +25,8 @@ class ApplicationController < ActionController::API
 
         return
       else
-        Rails.logger.warn "⚠️ Email provided but user not found: #{params[:email]}"
       end
     else
-      Rails.logger.warn "⚠️ No email parameter provided for auto-login"
     end
 
     # If no current user and no auto-login possible, return unauthorized

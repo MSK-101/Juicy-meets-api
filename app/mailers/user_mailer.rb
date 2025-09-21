@@ -40,15 +40,9 @@ class UserMailer < ApplicationMailer
         "text": text_content
       })
 
-      Rails.logger.info "Password email sent successfully: #{result[:id]}"
       result
     rescue Resend::Error => e
-      Rails.logger.error "Resend Error Details:"
-      Rails.logger.error "  Message: #{e.message}"
-      Rails.logger.error "  Class: #{e.class}"
-      Rails.logger.error "  Response: #{e.response_body if e.respond_to?(:response_body)}"
-      Rails.logger.error "  Status: #{e.status_code if e.respond_to?(:status_code)}"
-      Rails.logger.error "  Full error: #{e.inspect}"
+
       raise e
     end
   end
@@ -82,7 +76,6 @@ class UserMailer < ApplicationMailer
       "text": text_content
     })
 
-    Rails.logger.info "Forgot password email sent successfully: #{result[:id]}"
     result
   end
 end

@@ -25,7 +25,6 @@ class AdminDashboardBlueprint < Blueprinter::Base
         userRetention: calculate_user_retention
       }
     rescue => e
-      Rails.logger.error "Error calculating dashboard stats: #{e.message}"
       {
         views: 0,
         revenue: 0,
@@ -46,7 +45,6 @@ class AdminDashboardBlueprint < Blueprinter::Base
       return 0 if total_users == 0
       ((paying_users.to_f / total_users) * 100).round(2)
     rescue => e
-      Rails.logger.error "Error calculating user retention: #{e.message}"
       0
     end
   end
@@ -80,7 +78,6 @@ class AdminDashboardBlueprint < Blueprinter::Base
         }
       end.reverse
     rescue => e
-      Rails.logger.error "Error calculating chart data: #{e.message}"
       []
     end
   end
@@ -103,7 +100,6 @@ class AdminDashboardBlueprint < Blueprinter::Base
             }
           end
     rescue => e
-      Rails.logger.error "Error calculating recent users: #{e.message}"
       []
     end
   end
@@ -121,7 +117,6 @@ class AdminDashboardBlueprint < Blueprinter::Base
              { name: name, views: views_in_minutes.round(2) }
            end
     rescue => e
-      Rails.logger.error "Error calculating top videos: #{e.message}"
       []
     end
   end

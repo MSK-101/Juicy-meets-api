@@ -128,11 +128,9 @@ export default function RealVideoChat() {
         });
         (this.peer as unknown as { on: (event: string, cb: (data: MediaStream) => void) => void }).on('stream', (remoteStream: MediaStream) => {
           if (remoteStream instanceof MediaStream) {
-            console.log('[VideoChat] Received remote stream:', remoteStream);
             setRemoteStream(remoteStream);
             if (remoteVideoRef.current) {
               remoteVideoRef.current.srcObject = remoteStream;
-              console.log('[VideoChat] Attached remote stream to video element.');
             }
           }
         });
@@ -217,7 +215,6 @@ export default function RealVideoChat() {
         } else {
           isInitiator = false;
         }
-        console.log(`[VideoChat] userId=${userId} ROOM=${ROOM} isInitiator=${isInitiator}`);
         // Create PubNub client
         pubnubRef.current = new PubNub({
           publishKey: process.env.NEXT_PUBLIC_PUBNUB_PUBLISH_KEY! || 'pub-c-796ad0ea-9bff-4bbf-be5e-b269b3fe0325',
@@ -262,7 +259,7 @@ export default function RealVideoChat() {
         }, 500);
         setIsInitialized(true);
       } catch (err) {
-        console.error('[VideoChat] Initialization error', err);
+        
       }
     };
     setTimeout(() => {
@@ -305,7 +302,6 @@ export default function RealVideoChat() {
       remoteVideoRef.current.play().catch(() => {});
       const userId = sessionStorage.getItem('videochat_user_id');
       const ROOM = window.location.hash.replace('#', '') || 'unknown';
-      console.log(`[VideoChat] useEffect: remoteStream attached for userId=${userId} ROOM=${ROOM}`, remoteStream);
     }
   }, [remoteStream]);
 

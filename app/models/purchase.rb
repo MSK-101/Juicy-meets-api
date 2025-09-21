@@ -42,7 +42,6 @@ class Purchase < ApplicationRecord
     end
     true
   rescue => e
-    Rails.logger.error "Failed to refund purchase: #{e.message}"
     false
   end
 

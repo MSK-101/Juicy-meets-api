@@ -18,21 +18,30 @@ class CoinDeductionService
     # Ensure user has at least the minimum coin balance after deduction
     if user.coin_balance > INITIAL_CONNECTION_COST + MINIMUM_COIN_BALANCE
       user.update!(coin_balance: user.coin_balance - INITIAL_CONNECTION_COST)
-      Rails.logger.info "💰 Deducted #{INITIAL_CONNECTION_COST} coin for initial connection from user #{user_id}. New balance: #{user.coin_balance}"
       return { success: true, deducted: INITIAL_CONNECTION_COST, new_balance: user.coin_balance }
     else
-      Rails.logger.warn "⚠️ User #{user_id} has insufficient coins (#{user.coin_balance}) for initial connection cost"
       return { success: false, error: 'Insufficient coins for connection' }
     end
   rescue => e
-    Rails.logger.error "❌ Error deducting initial connection cost for user #{user_id}: #{e.message}"
     return { success: false, error: e.message }
   end
 
   def self.apply_duration_based_deductions(user_id, chat_duration_seconds)
     user = User.find(user_id)
-    active_rules = DeductionRule.active.ordered
 
+    # Early exit if user has no coins - avoid processing rules entirely
+    if user.coin_balance <= MINIMUM_COIN_BALANCE
+      return {
+        success: true,
+        deducted: 0,
+        new_balance: user.coin_balance,
+        applied_rules: [],
+        chat_duration: chat_duration_seconds,
+        no_coins: true # Flag to indicate zero balance
+      }
+    end
+
+    active_rules = DeductionRule.active.duration_based.ordered
     total_deducted = 0
     applied_rules = []
 
@@ -50,9 +59,7 @@ class CoinDeductionService
             coins: coins_to_deduct,
             rule_name: rule.name
           }
-          Rails.logger.info "💰 Applied deduction rule: #{rule.name} (#{rule.threshold_seconds}s → #{coins_to_deduct} coins) for user #{user_id}"
         else
-          Rails.logger.warn "⚠️ User #{user_id} has no coins left for rule #{rule.name}"
           break
         end
       end
@@ -64,8 +71,6 @@ class CoinDeductionService
       actual_deducted = user.coin_balance - final_balance
 
       user.update!(coin_balance: final_balance)
-
-      Rails.logger.info "💰 Applied duration-based deductions for user #{user_id}: #{actual_deducted} coins. New balance: #{final_balance}"
 
       return {
         success: true,
@@ -79,7 +84,6 @@ class CoinDeductionService
     end
 
   rescue => e
-    Rails.logger.error "❌ Error applying duration-based deductions for user #{user_id}: #{e.message}"
     return { success: false, error: e.message }
   end
 
@@ -87,7 +91,6 @@ class CoinDeductionService
     user = User.find(user_id)
     return { success: true, balance: user.coin_balance }
   rescue => e
-    Rails.logger.error "❌ Error getting user balance for user #{user_id}: #{e.message}"
     return { success: false, error: e.message }
   end
 
@@ -96,15 +99,12 @@ class CoinDeductionService
 
     # Check if user has sufficient coins
     if user.coin_balance < rule.coins
-      Rails.logger.warn "⚠️ User #{user_id} has insufficient coins (#{user.coin_balance}) for per-swipe deduction (#{rule.coins})"
       return { success: false, deducted: 0, new_balance: user.coin_balance, error: 'Insufficient coins for swipe' }
     end
 
     # Apply the deduction
     new_balance = user.coin_balance - rule.coins
     user.update!(coin_balance: new_balance)
-
-    Rails.logger.info "💰 Applied per-swipe deduction: #{rule.coins} coins for user #{user_id}. New balance: #{new_balance}"
 
     {
       success: true,
@@ -118,7 +118,6 @@ class CoinDeductionService
       }
     }
   rescue => e
-    Rails.logger.error "❌ Error applying per-swipe deduction for user #{user_id}: #{e.message}"
     return { success: false, deducted: 0, new_balance: user.coin_balance, error: e.message }
   end
 end

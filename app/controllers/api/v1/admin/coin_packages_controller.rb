@@ -89,7 +89,6 @@ class Api::V1::Admin::CoinPackagesController < Api::V1::Admin::BaseController
   end
 
   def destroy
-    debugger
     if @coin_package.destroy
       render json: { message: 'Coin package deleted successfully' }
     else

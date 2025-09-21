@@ -11,7 +11,6 @@ class AdminUsersBlueprint < Blueprinter::Base
     begin
       user.purchases.completed.sum(:coins_count) || 0
     rescue => e
-      Rails.logger.error "Error calculating coinPurchased for user #{user.id}: #{e.message}"
       0
     end
   end
@@ -20,7 +19,6 @@ class AdminUsersBlueprint < Blueprinter::Base
     begin
       user.purchases.completed.count
     rescue => e
-      Rails.logger.error "Error calculating deposits for user #{user.id}: #{e.message}"
       0
     end
   end
@@ -29,7 +27,6 @@ class AdminUsersBlueprint < Blueprinter::Base
     begin
       user.purchases.completed.sum(:price) || 0
     rescue => e
-      Rails.logger.error "Error calculating totalSpent for user #{user.id}: #{e.message}"
       0
     end
   end

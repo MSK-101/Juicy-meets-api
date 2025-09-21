@@ -12,8 +12,6 @@ class Api::V1::Admin::DashboardController < Api::V1::Admin::BaseController
         data: dashboard_data
       }
     rescue => e
-      Rails.logger.error "Dashboard error: #{e.message}"
-      Rails.logger.error e.backtrace.join("\n")
 
       render json: {
         success: false,

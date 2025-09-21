@@ -40,7 +40,6 @@ class Api::V1::OmniauthCallbacksController < ApplicationController
         }, status: :unprocessable_entity
       end
     rescue => e
-      Rails.logger.error "OAuth Error: #{e.message}"
       render json: {
         success: false,
         message: 'Authentication failed',

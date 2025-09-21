@@ -45,7 +45,6 @@ class Api::V1::UsersController < ApplicationController
       # Get the JWT token from the request headers after sign_in
       token = request.env['warden-jwt_auth.token']
 
-
       render json: {
         success: true,
         data: {
