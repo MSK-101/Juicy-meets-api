@@ -366,7 +366,7 @@ class OptimizedPoolMatchingService
     end
 
     # Handle ActiveRecord::Relation (original logic)
-    if @user.interested_in.present? && @user.interested_in != 'other' && @pool.name == 'Pool A'
+    if @user.interested_in.present? && @user.interested_in != 'other' && @pool.name == 'Pool K'
       preferred_query = base_query_or_array.where(users: { gender: @user.interested_in })
       preferred_match = preferred_query.first
       return preferred_match if preferred_match
