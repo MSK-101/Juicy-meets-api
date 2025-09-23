@@ -247,9 +247,11 @@ class Api::V1::VideoChatController < ApplicationController
   end
 
   # POST /api/video_chat/swipe
-  # User swipes to get next match
+  # User swipes to get next match - ULTRA FAST with background jobs
   def swipe
     user_id = current_user.id
+
+    # Ultra-fast: Single query with minimal includes
     waiting_entry = VideoWaitingRoom.find_by(user_id: user_id)
 
     unless waiting_entry
@@ -257,48 +259,29 @@ class Api::V1::VideoChatController < ApplicationController
       return
     end
 
+    # ULTRA FAST: Move session cleanup to background job
     if waiting_entry.room_id.present?
-      end_current_session(waiting_entry.room_id, user_id)
+      SessionCleanupJob.perform_later(waiting_entry.room_id, user_id)
     end
 
-    # Apply per-swipe deduction if user has coins
-    swipe_deduction_result = apply_per_swipe_deduction(user_id)
+    # ULTRA FAST: Move coin deduction to background job
+    CoinDeductionJob.perform_later(user_id, :per_swipe)
 
-    # Try to find next match (service will handle room cleanup automatically)
+    # Fast: Get matching service and find match
     matching_service = PoolMatchingAdapter.new(user_id)
     match_result = matching_service.find_next_match
 
     if match_result[:success]
-      # Create session for tracking
-      session = matching_service.create_session(match_result)
+      # ULTRA FAST: Move all heavy operations to background jobs
+      SessionManagementJob.perform_later(user_id, match_result)
+      UserInfoUpdateJob.perform_later(user_id)
 
-      # Get updated user info after potential sequence advancement
-      updated_user_info = matching_service.get_updated_sequence_info
-
-      render json: {
-        status: 'matched',
-        room_id: match_result[:room_id],
-        match_type: match_result[:match_type],
-        actual_match_type: match_result[:actual_match_type],  # Add actual match type for frontend logic
-        partner: {
-          id: match_result[:partner_id] || 'video',
-          type: match_result[:match_type]
-        },
-        is_initiator: match_result[:is_initiator],
-        session_id: session&.session_id,
-        session_version: match_result[:session_version],
-        video_id: match_result[:video_id],
-        video_url: match_result[:video_url],
-        video_name: match_result[:video_name],
-        updated_user_info: updated_user_info,
-        swipe_deduction: swipe_deduction_result
-      }
+      # ULTRA FAST: Return immediately with minimal data (no database queries)
+      response_data = build_ultra_fast_match_response(match_result)
+      render json: response_data
     else
-      render json: {
-        status: 'waiting',
-        message: match_result[:message],
-        swipe_deduction: swipe_deduction_result
-      }
+      # ULTRA FAST: Return waiting status immediately
+      render json: build_ultra_fast_waiting_response(match_result)
     end
   end
 
@@ -399,6 +382,145 @@ class Api::V1::VideoChatController < ApplicationController
     result
   rescue => e
     { success: false, deducted: 0, new_balance: user&.coin_balance || 0, error: e.message }
+  end
+
+  # Optimized version with caching and reduced queries
+  def apply_per_swipe_deduction_optimized(user_id)
+    # Cache user balance check to avoid repeated queries
+    @user_balance ||= User.find(user_id).coin_balance
+
+    if @user_balance <= 0
+      return {
+        success: true,
+        deducted: 0,
+        new_balance: @user_balance,
+        error: 'No coins available',
+        no_coins: true
+      }
+    end
+
+    # Cache per-swipe rule to avoid repeated queries
+    @per_swipe_rule ||= DeductionRule.active.per_swipe.first
+
+    unless @per_swipe_rule
+      return {
+        success: true,
+        deducted: 0,
+        new_balance: @user_balance,
+        error: 'No per-swipe rule configured'
+      }
+    end
+
+    # Apply the deduction
+    result = CoinDeductionService.apply_per_swipe_deduction(user_id, @per_swipe_rule)
+
+    # Update cached balance if deduction was successful
+    if result[:success] && result[:new_balance]
+      @user_balance = result[:new_balance]
+    end
+
+    result
+  rescue => e
+    { success: false, deducted: 0, new_balance: @user_balance || 0, error: e.message }
+  end
+
+  # Extract response building to reduce code duplication
+  def build_match_response(match_result, session, updated_user_info, swipe_deduction_result)
+    {
+      status: 'matched',
+      room_id: match_result[:room_id],
+      match_type: match_result[:match_type],
+      actual_match_type: match_result[:actual_match_type],
+      partner: {
+        id: match_result[:partner_id] || 'video',
+        type: match_result[:match_type]
+      },
+      is_initiator: match_result[:is_initiator],
+      session_id: session&.session_id,
+      session_version: match_result[:session_version],
+      video_id: match_result[:video_id],
+      video_url: match_result[:video_url],
+      video_name: match_result[:video_name],
+      updated_user_info: updated_user_info,
+      swipe_deduction: swipe_deduction_result
+    }
+  end
+
+  def build_waiting_response(match_result, swipe_deduction_result)
+    {
+      status: 'waiting',
+      message: match_result[:message],
+      swipe_deduction: swipe_deduction_result
+    }
+  end
+
+  # Ultra-fast response builders for immediate return
+  def build_fast_match_response(match_result, updated_user_info)
+    {
+      status: 'matched',
+      room_id: match_result[:room_id],
+      match_type: match_result[:match_type],
+      actual_match_type: match_result[:actual_match_type],
+      partner: {
+        id: match_result[:partner_id] || 'video',
+        type: match_result[:match_type]
+      },
+      is_initiator: match_result[:is_initiator],
+      session_version: match_result[:session_version],
+      video_id: match_result[:video_id],
+      video_url: match_result[:video_url],
+      video_name: match_result[:video_name],
+      updated_user_info: updated_user_info,
+      # Note: session_id will be available after background job completes
+      processing: {
+        session_creation: 'in_progress',
+        coin_deduction: 'in_progress'
+      }
+    }
+  end
+
+  def build_fast_waiting_response(match_result)
+    {
+      status: 'waiting',
+      message: match_result[:message],
+      processing: {
+        coin_deduction: 'in_progress'
+      }
+    }
+  end
+
+  # Ultra-fast response builders - minimal data, maximum speed
+  def build_ultra_fast_match_response(match_result)
+    {
+      status: 'matched',
+      room_id: match_result[:room_id],
+      match_type: match_result[:match_type],
+      actual_match_type: match_result[:actual_match_type],
+      partner: {
+        id: match_result[:partner_id] || 'video',
+        type: match_result[:match_type]
+      },
+      is_initiator: match_result[:is_initiator],
+      session_version: match_result[:session_version],
+      video_id: match_result[:video_id],
+      video_url: match_result[:video_url],
+      video_name: match_result[:video_name],
+      processing: {
+        session_creation: 'in_progress',
+        coin_deduction: 'in_progress',
+        user_info_update: 'in_progress'
+      }
+    }
+  end
+
+  def build_ultra_fast_waiting_response(match_result)
+    {
+      status: 'waiting',
+      message: match_result[:message],
+      processing: {
+        coin_deduction: 'in_progress'
+      }
+    }
   end
 
   def end_current_session(room_id, user_id)

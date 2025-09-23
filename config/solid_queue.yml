@@ -1,0 +1,40 @@
+# SolidQueue configuration for background job processing
+production:
+  dispatchers:
+    - polling_interval: 1
+      batch_size: 500
+      concurrency_maintenance_interval: 600
+      concurrency_maintenance_interval_jitter: 30
+      queues: "*"
+      threads: 5
+  workers:
+    - queues: "default"
+      threads: 3
+    - queues: "high_priority"
+      threads: 5
+    - queues: "low_priority"
+      threads: 2
+
+development:
+  dispatchers:
+    - polling_interval: 1
+      batch_size: 100
+      concurrency_maintenance_interval: 600
+      concurrency_maintenance_interval_jitter: 30
+      queues: "*"
+      threads: 2
+  workers:
+    - queues: "default"
+      threads: 2
+
+test:
+  dispatchers:
+    - polling_interval: 0.1
+      batch_size: 10
+      concurrency_maintenance_interval: 600
+      concurrency_maintenance_interval_jitter: 30
+      queues: "*"
+      threads: 1
+  workers:
+    - queues: "default"
+      threads: 1

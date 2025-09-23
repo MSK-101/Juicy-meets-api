@@ -63,6 +63,6 @@ end
 
 # Resend for production email delivery
 gem "resend"
-
+gem 'solid_queue'
 # Environment variable management
 gem "figaro"
