@@ -9,16 +9,7 @@ class Api::V1::VideoChatController < ApplicationController
   # User joins the video chat queue
   def join
     user_id = current_user.id
-
-    # Find or create a waiting room entry
-    waiting_entry = VideoWaitingRoom.find_by(user_id: user_id)
     current_user.go_online
-    if waiting_entry && waiting_entry.status == 'waiting'
-      # User already in queue, return current status
-      render json: { status: 'already_in_queue' }
-      return
-    end
-
     # Clean up any old entries for this user
     VideoWaitingRoom.where(user_id: user_id).destroy_all
 
