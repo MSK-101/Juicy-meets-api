@@ -51,9 +51,9 @@ class OptimizedPoolMatchingService
     return failure_result('Sequence not found') unless @sequence
 
     # Handle ongoing video sessions
-    if watching_video?
-      return handle_video_swipe
-    end
+    # if watching_video?
+    #   return handle_video_swipe
+    # end
 
     # Try matching with retries
     attempt_matching_with_retries(max_retries)
@@ -197,7 +197,13 @@ class OptimizedPoolMatchingService
 
   def find_video_match(allow_repeats: false)
     return failure_result('Staff users do not watch videos') if @user.role == 'staff'
-    return failure_result('Users/staff available, no video needed') unless should_show_video?
+
+    # Only check if videos should be shown when content type is not specifically 'recorded_videos'
+    # When sequence content type is 'recorded_videos', we must respect that and show videos
+    unless @sequence.content_type.include?('recorded_videos')
+      return failure_result('Users/staff available, no video needed') unless should_show_video?
+    end
+
     video = if allow_repeats
       get_video_with_rotation
     else
@@ -731,10 +737,22 @@ class OptimizedPoolMatchingService
   end
 
   def handle_video_swipe
-    return find_real_user_match if find_real_user_match[:success]
-    return find_staff_match if find_staff_match[:success]
+    # Respect sequence content type priority even when swiping from video
+    if @sequence.content_type.include?('recorded_videos')
+      # If sequence is video-focused, try video first, then fallback to others
+      video_match = find_video_match(allow_repeats: true)
+      return video_match if video_match[:success]
+      return find_real_user_match if find_real_user_match[:success]
+      return find_staff_match if find_staff_match[:success]
+    else
+      # Original priority: real users → staff → videos
+      return find_real_user_match if find_real_user_match[:success]
+      return find_staff_match if find_staff_match[:success]
+      video_match = find_video_match(allow_repeats: true)
+      return video_match if video_match[:success]
+    end
 
-    find_video_match(allow_repeats: true)
+    failure_result('No matches available')
   end
 
   # Use cached data instead of querying every time
