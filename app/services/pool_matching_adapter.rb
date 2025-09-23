@@ -4,7 +4,7 @@
 class PoolMatchingAdapter
   def self.use_optimized_service?
     # Enable via environment variable or feature flag
-    ENV['USE_OPTIMIZED_MATCHING'] == 'true' || Rails.env.development?
+    return true
   end
 
   def self.new(user_id)
