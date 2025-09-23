@@ -62,10 +62,10 @@ class OptimizedPoolMatchingService
   # Handle swipe to next match
   def find_next_match
     return failure_result('User not found') unless @user
-
-    cleanup_current_session
     check_and_advance_sequence
+    reset_waiting_entry(@waiting_entry) if @waiting_entry
     find_match
+    cleanup_current_session
   end
 
   # Create session tracking
