@@ -663,15 +663,7 @@ class OptimizedPoolMatchingService
   # ============================================================================
 
   def should_show_video?
-    return true
-    return false if @user.role == 'staff'
-    return false unless @sequence
-
-    # Only show video if no real users or staff available
-    real_users_available = build_real_user_query(false).exists?
-    staff_available = build_staff_query(false).exists?
-
-    !real_users_available && !staff_available && @sequence.videos.active.exists?
+    @sequence.videos.active.exists?
   end
 
   def get_unwatched_video
