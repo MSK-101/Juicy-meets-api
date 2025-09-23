@@ -37,10 +37,10 @@ class OptimizedPoolMatchingService
     @sequence = find_user_sequence
     @waiting_entry = @user.video_waiting_rooms.first
 
-    # Cache frequently accessed data with optimized queries
-    @users_in_sessions = cache_active_session_users_optimized
-    @recent_partners = cache_recent_partner_ids_optimized
-    @historical_matches = cache_historical_matches_optimized
+    # # Cache frequently accessed data with optimized queries
+    # @users_in_sessions = cache_active_session_users_optimized
+    # @recent_partners = cache_recent_partner_ids_optimized
+    # @historical_matches = cache_historical_matches_optimized
 
   end
 
