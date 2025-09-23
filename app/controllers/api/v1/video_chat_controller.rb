@@ -264,7 +264,9 @@ class Api::V1::VideoChatController < ApplicationController
 
     if match_result[:success]
       # ULTRA FAST: Move all heavy operations to background jobs
-      SessionManagementJob.perform_later(user_id, match_result)
+      # Convert MatchResult to hash for ActiveJob serialization
+      match_data = match_result.is_a?(Hash) ? match_result : match_result.to_h
+      SessionManagementJob.perform_later(user_id, match_data)
       UserInfoUpdateJob.perform_later(user_id)
 
       # ULTRA FAST: Return immediately with minimal data (no database queries)

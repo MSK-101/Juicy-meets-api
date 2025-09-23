@@ -29,6 +29,8 @@ class PoolMatchingAdapter
     # Convert OptimizedPoolMatchingService::MatchResult to hash for compatibility
     if result.is_a?(OptimizedPoolMatchingService::MatchResult)
       result.to_h
+    elsif result.is_a?(Hash)
+      result
     else
       result
     end
