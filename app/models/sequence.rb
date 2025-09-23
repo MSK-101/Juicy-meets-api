@@ -36,6 +36,18 @@ class Sequence < ApplicationRecord
     content_type.map { |type| type.humanize.gsub('_', ' ') }
   end
 
+  def ordered_content_type
+    # Define the preferred order
+    preferred_order = %w[app_users staff recorded_videos]
+    # Sort content_type based on the preferred order
+    content_type.sort_by { |type| preferred_order.index(type) || preferred_order.length }
+  end
+
+  # Alias for content_types that always returns ordered content types
+  def content_types
+    ordered_content_type
+  end
+
   private
 
   def content_type_values

@@ -180,7 +180,6 @@ class OptimizedPoolMatchingService
 
     base_query = build_real_user_query(allow_repeats)
     user_match = find_user_with_gender_preference(base_query)
-
     return failure_result('No real users available') unless user_match
 
     create_user_to_user_match(user_match)
@@ -191,7 +190,6 @@ class OptimizedPoolMatchingService
 
     base_query = build_staff_query(allow_repeats)
     staff_match = find_user_with_gender_preference(base_query)
-
     return failure_result('No staff available') unless staff_match
 
     create_user_to_staff_match(staff_match)
@@ -200,7 +198,6 @@ class OptimizedPoolMatchingService
   def find_video_match(allow_repeats: false)
     return failure_result('Staff users do not watch videos') if @user.role == 'staff'
     return failure_result('Users/staff available, no video needed') unless should_show_video?
-
     video = if allow_repeats
       get_video_with_rotation
     else
@@ -666,6 +663,7 @@ class OptimizedPoolMatchingService
   # ============================================================================
 
   def should_show_video?
+    return true
     return false if @user.role == 'staff'
     return false unless @sequence
 
