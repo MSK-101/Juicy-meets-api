@@ -595,7 +595,6 @@ class OptimizedPoolMatchingService
       # Update user's sequence and reset video count
       update_user_sequence(next_sequence, reset_count: true)
       @sequence = next_sequence  # Update instance variable
-      @user.reload
       return true
     else
       # No more sequences, wrap back to first sequence
@@ -603,7 +602,6 @@ class OptimizedPoolMatchingService
       if first_sequence
         update_user_sequence(first_sequence, reset_count: true)
         @sequence = first_sequence  # Update instance variable
-        @user.reload
         return true
       else
         return false
