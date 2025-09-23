@@ -83,3 +83,9 @@ production:
   database: juicy_meets_api_production
   username: juicy_meets_api
   password: <%= ENV["JUICY_MEETS_API_DATABASE_PASSWORD"] %>
+
+solid_queue:
+  <<: *default
+  database: juicy_meets_api_solid_queue
+  username: juicy_meets_api
+  password: <%= ENV["JUICY_MEETS_API_DATABASE_PASSWORD"] %>
