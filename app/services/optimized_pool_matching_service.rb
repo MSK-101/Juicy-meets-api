@@ -64,8 +64,9 @@ class OptimizedPoolMatchingService
     return failure_result('User not found') unless @user
     check_and_advance_sequence
     reset_waiting_entry(@waiting_entry) if @waiting_entry
-    find_match
+    match_result = find_match
     cleanup_current_session
+    match_result
   end
 
   # Create session tracking
