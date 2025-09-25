@@ -64,6 +64,11 @@ class OptimizedPoolMatchingService
     return failure_result('User not found') unless @user
 
     cleanup_current_session
+
+    # Increment video count on every swipe attempt (not just successful matches)
+    # This ensures users progress through sequences even if no matches are available
+    increment_video_count
+
     check_and_advance_sequence
     find_match
   end
@@ -423,7 +428,7 @@ class OptimizedPoolMatchingService
     ActiveRecord::Base.transaction do
       room_data = create_room_and_session_data
       update_waiting_entries(other_user, room_data, 'real_user')
-      increment_video_count
+      # Video count already incremented in find_next_match
 
       success_result(
         match_type: 'real_user',
@@ -444,7 +449,7 @@ class OptimizedPoolMatchingService
 
       room_data = create_room_and_session_data
       update_waiting_entries(staff_entry, room_data, 'staff')
-      increment_video_count
+      # Video count already incremented in find_next_match
 
       success_result(
         match_type: 'staff',
@@ -471,7 +476,7 @@ class OptimizedPoolMatchingService
       is_initiator: true
     )
 
-    increment_video_count
+    # Video count already incremented in find_next_match
 
     success_result(
       match_type: 'video',
