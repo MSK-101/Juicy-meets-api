@@ -618,7 +618,19 @@ class OptimizedPoolMatchingService
     current_position = @sequence.position
 
     # Find next sequence
-    next_sequence = active_sequences.find { |seq| seq.position > current_position && seq.videos.active.any? }
+    # NOTE:
+    # Previously this required the next sequence to have active videos, which caused
+    # users to get stuck on a video-focused sequence (e.g., recorded_videos with count 1)
+    # if the subsequent sequence did not have videos (e.g., app_users, staff).
+    #
+    # Correct behavior:
+    # - If the next sequence includes 'recorded_videos', require it to have active videos
+    # - Otherwise, allow advancing regardless of videos being present
+    next_sequence = active_sequences.find do |seq|
+      seq.position > current_position && (
+        !seq.content_type.include?('recorded_videos') || seq.videos.active.any?
+      )
+    end
 
     if next_sequence
       next_sequence
