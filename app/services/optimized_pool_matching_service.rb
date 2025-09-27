@@ -94,8 +94,6 @@ class OptimizedPoolMatchingService
     }
   end
 
-  private
-
   # ============================================================================
   # CORE MATCHING LOGIC
   # ============================================================================
@@ -225,6 +223,7 @@ class OptimizedPoolMatchingService
   # ============================================================================
 
   def build_real_user_query(allow_repeats)
+    # ULTRA-OPTIMIZED: Use raw SQL for fastest possible query
     base_query = base_user_query.where(match_type: 'real_user')
 
     if allow_repeats

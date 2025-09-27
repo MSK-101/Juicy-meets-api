@@ -53,12 +53,12 @@ Rails.application.routes.draw do
       # Purchases
       resources :purchases, only: [:create]
 
-      # Video Chat routes - Simple backend-controlled matching
+      # Video Chat routes - Real-time backend with PubNub notifications
       namespace :video_chat do
-        post :join           # Join video chat queue
-        get :status          # Check match status
+        post :join           # Join video chat queue (with instant notifications)
+        get :status          # Check match status (fallback for polling)
         post :leave          # Leave chat
-        post :swipe          # Swipe to next match
+        post :swipe          # Swipe to next match (with instant notifications)
         post :end_session    # End current session
         post :clear_waiting_room # Clear waiting room after successful connection
         get :deduction_rules # Get active deduction rules

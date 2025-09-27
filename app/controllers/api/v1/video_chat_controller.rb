@@ -6,10 +6,11 @@ class Api::V1::VideoChatController < ApplicationController
   # Include coin deduction service for connection costs
 
   # POST /api/video_chat/join
-  # User joins the video chat queue
+  # User joins the video chat queue with real-time notifications
   def join
     user_id = current_user.id
     current_user.go_online
+
     # Clean up any old entries for this user
     VideoWaitingRoom.where(user_id: user_id).destroy_all
 
@@ -18,6 +19,7 @@ class Api::V1::VideoChatController < ApplicationController
     pool = user.pool
     sequence = user.role == 'staff' ? user.staff_assignment&.sequence : user.pool&.sequences&.active&.ordered&.first
     match_type = user.role == 'staff' ? 'staff' : 'real_user'
+
     # Create new waiting room entry with pool and sequence info
     waiting_entry = VideoWaitingRoom.create!(
       user_id: user_id,
@@ -28,8 +30,8 @@ class Api::V1::VideoChatController < ApplicationController
       match_type: match_type
     )
 
-    # Try to find a match using the pool matching service
-    matching_service = PoolMatchingAdapter.new(user_id)
+    # Use real-time matching service with instant PubNub notifications
+    matching_service = RealtimePoolMatchingService.new(user_id)
     match_result = matching_service.find_match
 
     if match_result[:success]
@@ -58,9 +60,13 @@ class Api::V1::VideoChatController < ApplicationController
   end
 
   # GET /api/video_chat/status
-  # Check if user has been matched
+  # DEPRECATED: Status polling replaced by real-time PubNub notifications
+  # Kept for backward compatibility and fallback scenarios
   def status
     user_id = current_user.id
+
+    # Status endpoint now mainly for fallback - real-time notifications via PubNub
+
     waiting_entry = VideoWaitingRoom.find_by(user_id: user_id)
 
     unless waiting_entry
@@ -69,7 +75,7 @@ class Api::V1::VideoChatController < ApplicationController
     end
 
     if waiting_entry.room_id.present?
-      # User has been matched - DO NOT call find_match again!
+      # User has been matched - return cached match data
 
       # Get the user's actual role for proper match_type
       user = User.find(user_id)
@@ -94,11 +100,11 @@ class Api::V1::VideoChatController < ApplicationController
       render json: {
         status: 'matched',
         room_id: waiting_entry.room_id,
-        match_type: user_match_type,  # Use user's role, not room's match_type
-        actual_match_type: actual_match_type,  # Add actual match type for frontend logic
+        match_type: user_match_type,
+        actual_match_type: actual_match_type,
         partner: {
           id: waiting_entry.partner_user_id || 'video',
-          type: waiting_entry.match_type  # Keep partner type as room's match_type
+          type: waiting_entry.match_type
         },
         is_initiator: waiting_entry.is_initiator,
         session_version: waiting_entry.session_version,
@@ -106,40 +112,14 @@ class Api::V1::VideoChatController < ApplicationController
         video_url: waiting_entry.video_info&.dig(:url),
         video_name: waiting_entry.video_info&.dig(:name)
       }
-      return  # Explicitly return to prevent any further processing
+      return
     end
 
-    # Check if we should try to find a match now
-    matching_service = PoolMatchingAdapter.new(user_id)
-    match_result = matching_service.find_match
-
-    if match_result[:success]
-      # Create session for tracking
-      session = matching_service.create_session(match_result)
-
-      # Get the user's actual role for proper match_type
-      user = User.find(user_id)
-      user_match_type = user.role == 'staff' ? 'staff' : 'real_user'
-
-      render json: {
-        status: 'matched',
-        room_id: match_result[:room_id],
-        match_type: user_match_type,  # Use user's role, not room's match_type
-        actual_match_type: match_result[:actual_match_type],  # Add actual match type for frontend logic
-        partner: {
-          id: match_result[:partner_id] || 'video',
-          type: match_result[:match_type]  # Keep partner type as room's match_type
-        },
-        is_initiator: match_result[:is_initiator],
-        session_id: session&.session_id,
-        session_version: match_result[:session_version],
-        video_id: match_result[:video_id],
-        video_url: match_result[:video_url],
-        video_name: match_result[:video_name]
-      }
-    else
-      render json: { status: 'waiting', message: match_result[:message] }
-    end
+    # Return waiting status - real-time notifications will handle match updates
+    render json: {
+      status: 'waiting',
+      message: 'Use PubNub notifications for real-time updates'
+    }
   end
 
   # Note: WebRTC signaling now handled by PubNub on frontend
@@ -199,27 +179,21 @@ class Api::V1::VideoChatController < ApplicationController
   end
 
   # POST /api/video_chat/leave
-  # User leaves the video chat
+  # User leaves the video chat with instant partner notification
   def leave
     user_id = current_user.id
-
-    # Use the pool matching service for proper cleanup
-    matching_service = PoolMatchingAdapter.new(user_id)
-
-    # Clean up any stale room assignments first
-    matching_service.cleanup_stale_room_assignments
-
-    # Handle room disconnection if user is in a room
-    matching_service.handle_room_disconnection
+    notification_service = PubnubNotificationService.new
 
     # Find and clean up all waiting room entries for this user
     waiting_entries = VideoWaitingRoom.where(user_id: user_id)
 
     waiting_entries.each do |waiting_entry|
-      if waiting_entry.room_id.present?
+      if waiting_entry.room_id.present? && waiting_entry.partner_user_id.present?
+        # INSTANT notification to partner that user left
+        notification_service.notify_partner_left(waiting_entry.partner_user_id, waiting_entry.room_id)
+
         # End the current session
         end_current_session(waiting_entry.room_id, user_id)
-
       end
 
       # Destroy the waiting entry
@@ -258,8 +232,8 @@ class Api::V1::VideoChatController < ApplicationController
     # ULTRA FAST: Move coin deduction to background job
     CoinDeductionJob.perform_later(user_id, :per_swipe)
 
-    # Fast: Get matching service and find match
-    matching_service = PoolMatchingAdapter.new(user_id)
+    # Use real-time matching service with instant PubNub notifications
+    matching_service = RealtimePoolMatchingService.new(user_id)
     match_result = matching_service.find_next_match
 
     if match_result[:success]
