@@ -16,7 +16,7 @@ class Api::V1::VideoChatController < ApplicationController
     # Get user's pool and sequence information
     user = User.find(user_id)
     pool = user.pool
-    sequence = user.pool&.sequences&.active&.ordered&.first
+    sequence = user.role == 'staff' ? user.staff_assignment&.sequence : user.pool&.sequences&.active&.ordered&.first
     match_type = user.role == 'staff' ? 'staff' : 'real_user'
     # Create new waiting room entry with pool and sequence info
     waiting_entry = VideoWaitingRoom.create!(
