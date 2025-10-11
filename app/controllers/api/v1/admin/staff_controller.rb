@@ -61,11 +61,9 @@ class Api::V1::Admin::StaffController < Api::V1::Admin::BaseController
     @user.password = User.generate_random_password
     @user.confirmed_at = Time.current
     @user.profile_completed = true # Staff profiles are completed by default
-
     if @user.save
       # Create staff assignment
       @staff_assignment = @user.build_staff_assignment(staff_assignment_params)
-
       if @staff_assignment.save
         @user.send_password_email
         render json: {
@@ -83,12 +81,14 @@ class Api::V1::Admin::StaffController < Api::V1::Admin::BaseController
         @user.destroy
         render json: {
           success: false,
+          message: @staff_assignment.errors.full_messages.join(', '),
           errors: @staff_assignment.errors.full_messages
         }, status: :unprocessable_entity
       end
     else
       render json: {
         success: false,
+        message: @user.errors.full_messages.join(', '),
         errors: @user.errors.full_messages
       }, status: :unprocessable_entity
     end
@@ -112,6 +112,7 @@ class Api::V1::Admin::StaffController < Api::V1::Admin::BaseController
     else
       render json: {
         success: false,
+        message: 'Failed to update staff member',
         errors: @user.errors.full_messages
       }, status: :unprocessable_entity
     end
@@ -129,6 +130,7 @@ class Api::V1::Admin::StaffController < Api::V1::Admin::BaseController
     else
       render json: {
         success: false,
+        message: 'Failed to delete staff member',
         errors: @user.errors.full_messages
       }, status: :unprocessable_entity
     end

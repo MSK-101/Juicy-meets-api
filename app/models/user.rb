@@ -52,7 +52,7 @@ class User < ApplicationRecord
 
   # Send password email
   def send_password_email
-    UserMailer.password_email(self, password).deliver_now
+    # UserMailer.password_email(self, password).deliver_now
   end
 
   def pool_id
