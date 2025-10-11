@@ -30,7 +30,7 @@ class Api::V1::Admin::AdminsController < Api::V1::Admin::BaseController
     else
       render json: {
         success: false,
-        message: 'Failed to create admin',
+        message: @admin.errors.full_messages.join(', '),
         errors: @admin.errors.full_messages
       }, status: :unprocessable_entity
     end
