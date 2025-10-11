@@ -2,6 +2,7 @@ class Video < ApplicationRecord
   # Enums
   has_one_attached :video_file
   has_many :video_chat_sessions, dependent: :destroy
+  has_many :video_waiting_rooms, dependent: :nullify
   enum gender: { male: 0, female: 1, other: 2 }
   enum status: { active: 0, pending: 1, inactive: 2 }
 

@@ -4,6 +4,7 @@ class VideoWaitingRoom < ApplicationRecord
   belongs_to :partner_user, class_name: 'User', optional: true
   belongs_to :pool, optional: true
   belongs_to :sequence, optional: true
+  belongs_to :video, optional: true
 
   validates :user_id, presence: true, uniqueness: true
   validates :status, inclusion: { in: %w[waiting matched] }

@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_09_09_213656) do
+ActiveRecord::Schema[7.2].define(version: 2025_10_11_204050) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -208,6 +208,16 @@ ActiveRecord::Schema[7.2].define(version: 2025_09_09_213656) do
     t.index ["status"], name: "index_users_on_status"
     t.index ["user_status"], name: "index_users_on_user_status"
     t.index ["videos_watched_in_current_sequence"], name: "index_users_on_videos_watched_in_current_sequence"
+  end
+
+  create_table "versions", force: :cascade do |t|
+    t.string "whodunnit"
+    t.datetime "created_at"
+    t.bigint "item_id", null: false
+    t.string "item_type", null: false
+    t.string "event", null: false
+    t.text "object"
+    t.index ["item_type", "item_id"], name: "index_versions_on_item_type_and_item_id"
   end
 
   create_table "video_chat_sessions", force: :cascade do |t|

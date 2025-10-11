@@ -66,4 +66,33 @@ class Api::V1::Admin::VideosController < Api::V1::Admin::BaseController
       }
     }
   end
+
+  # DELETE /api/v1/admin/videos/:id
+  def destroy
+    @video = Video.find(params[:id])
+
+    if @video.destroy
+      render json: {
+        success: true,
+        message: 'Video deleted successfully'
+      }
+    else
+      render json: {
+        success: false,
+        message: @video.errors.full_messages.join(', '),
+        errors: @video.errors.full_messages
+      }, status: :unprocessable_entity
+    end
+  rescue ActiveRecord::RecordNotFound
+    render json: {
+      success: false,
+      message: 'Video not found'
+    }, status: :not_found
+  end
+
+  private
+
+  def set_video
+    @video = Video.find(params[:id])
+  end
 end
