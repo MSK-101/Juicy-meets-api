@@ -700,20 +700,52 @@ class OptimizedPoolMatchingService
     all_videos = @sequence.videos.active.order(:created_at)
     return all_videos.first if all_videos.size <= 1
 
-    last_video = @user.video_chat_sessions
-                     .where(sequence_id: @sequence.id)
-                     .joins(:video)
-                     .order(created_at: :desc)
-                     .first&.video
+    # Get all videos with their last match times
+    video_match_times = get_video_match_times
 
-    if last_video
-      videos_array = all_videos.to_a
-      current_index = videos_array.find_index { |v| v.id == last_video.id }
-      next_index = current_index ? (current_index + 1) % videos_array.size : 0
-      videos_array[next_index]
-    else
-      all_videos.first
+    # Find the video with the oldest match time (least recently watched)
+    oldest_video = find_video_with_oldest_match(all_videos, video_match_times)
+
+    # Debug logging for video rotation
+    if oldest_video
+      last_match_time = video_match_times[oldest_video.id]
+      time_ago = last_match_time ? ((Time.current - last_match_time) / 1.minute).round(1) : "never"
+      Rails.logger.info "Video rotation: Selected video #{oldest_video.id} (#{oldest_video.name}) - last watched #{time_ago} minutes ago"
     end
+
+    oldest_video || all_videos.first
+  end
+
+  # Get the last match time for each video in this sequence
+  def get_video_match_times
+    @user.video_chat_sessions
+         .where(sequence_id: @sequence.id)
+         .where.not(video_id: nil)
+         .group(:video_id)
+         .maximum(:created_at)
+  end
+
+  # Find the video that was watched least recently (oldest match time)
+  def find_video_with_oldest_match(all_videos, video_match_times)
+    return all_videos.first if video_match_times.empty?
+
+    # Create array of videos with their match times
+    videos_with_times = all_videos.map do |video|
+      last_match_time = video_match_times[video.id]
+      {
+        video: video,
+        last_match_time: last_match_time || Time.at(0), # Never watched = oldest possible time
+        video_id: video.id
+      }
+    end
+
+    # Sort by last match time (oldest first), then by video creation time for tie-breaking
+    sorted_videos = videos_with_times.sort_by do |item|
+      [item[:last_match_time], item[:video].created_at]
+    end
+
+    # Return the video with the oldest match time
+    sorted_videos.first[:video]
   end
 
   # ============================================================================
