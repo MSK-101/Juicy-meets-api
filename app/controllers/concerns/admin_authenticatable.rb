@@ -26,8 +26,8 @@ module AdminAuthenticatable
       end
     end
 
-    # Try auto-login if email is provided in params
-    if params[:email].present? && token.present?
+    # Try auto-login if email is provided in params (regardless of token validity)
+    if params[:email].present?
       admin = Admin.find_by(email: params[:email])
       if admin
         @current_admin = admin
@@ -45,9 +45,7 @@ module AdminAuthenticatable
         # Add new token to response headers
         response.headers['X-New-Token'] = new_token
         return
-      else
       end
-    else
     end
 
     # If no admin found and no auto-login possible, return unauthorized

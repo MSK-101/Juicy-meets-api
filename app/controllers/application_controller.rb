@@ -11,7 +11,6 @@ class ApplicationController < ActionController::API
     # If user is already authenticated, return early
     return if current_user
 
-    # Try auto-login if email is provided in params
     if params[:email].present?
       user = User.find_by(email: params[:email])
       if user
@@ -24,9 +23,7 @@ class ApplicationController < ActionController::API
         end
 
         return
-      else
       end
-    else
     end
 
     # If no current user and no auto-login possible, return unauthorized
