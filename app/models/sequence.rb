@@ -2,6 +2,10 @@ class Sequence < ApplicationRecord
   # Associations
   belongs_to :pool
   has_many :videos, dependent: :destroy
+  has_many :users, dependent: :nullify
+  has_many :staff_assignments, dependent: :nullify
+  has_many :video_chat_sessions, dependent: :nullify
+  has_many :video_waiting_rooms, dependent: :nullify
 
   # Constants
   CONTENT_TYPES = %w[recorded_videos app_users staff].freeze
