@@ -1,7 +1,7 @@
 class AdminUsersBlueprint < Blueprinter::Base
   identifier :id
 
-  fields :email, :coin_balance, :user_status, :created_at, :last_activity_at
+  fields :email, :coin_balance, :user_status, :created_at, :last_activity_at, :report_count
 
   field :username do |user|
     user.email.split('@').first
@@ -53,6 +53,24 @@ class AdminUsersBlueprint < Blueprinter::Base
       'pending'
     else
       'inactive'
+    end
+  end
+
+  field :blockedUsersCount do |user|
+    user.blocked_users&.length || 0
+  end
+
+  field :isBanned do |user|
+    user.user_status == 'suspended'
+  end
+
+  field :banReason do |user|
+    if user.user_status == 'suspended' && user.report_count >= 5
+      "Auto-banned after #{user.report_count} reports"
+    elsif user.user_status == 'suspended'
+      "Manually banned"
+    else
+      nil
     end
   end
 end

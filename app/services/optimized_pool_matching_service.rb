@@ -32,6 +32,7 @@ class OptimizedPoolMatchingService
     ).find_by(id: user_id)
 
     return unless @user
+    return failure_result('User account suspended') if @user.user_status == 'suspended'
 
     @pool = @user.pool  # This is a method that determines pool based on coins/staff
     @sequence = find_user_sequence
@@ -49,6 +50,11 @@ class OptimizedPoolMatchingService
     return failure_result('User not found') unless @user
     return failure_result('Pool not assigned') unless @pool
     return failure_result('Sequence not found') unless @sequence
+
+    # Check if user is suspended
+    if @user.user_status == 'suspended'
+      return failure_result('User account suspended')
+    end
 
     # Handle ongoing video sessions
     # if watching_video?
@@ -226,6 +232,9 @@ class OptimizedPoolMatchingService
     # ULTRA-OPTIMIZED: Use raw SQL for fastest possible query
     base_query = base_user_query.where(match_type: 'real_user')
 
+    # CRITICAL: Exclude blocked users from matching
+    base_query = exclude_blocked_users(base_query)
+
     if allow_repeats
       # When allowing repeats, use deterministic prioritization
       # This returns an array, not a query
@@ -253,6 +262,9 @@ class OptimizedPoolMatchingService
 
     # Apply exclusions only if we have data to exclude
     base_query = base_query.where.not(users: { id: @users_in_sessions }) if @users_in_sessions.any?
+
+    # CRITICAL: Exclude blocked users from matching
+    base_query = exclude_blocked_users(base_query)
 
     if allow_repeats
       # When allowing repeats with staff, use deterministic prioritization
@@ -283,6 +295,18 @@ class OptimizedPoolMatchingService
     query = query.where.not(users: { id: @users_in_sessions }) if @users_in_sessions.any?
 
     query
+  end
+
+  # CRITICAL: Exclude users that the current user has blocked
+  def exclude_blocked_users(query)
+    return query unless @user&.blocked_users&.any?
+
+    # Convert blocked user IDs to integers for proper comparison
+    blocked_user_ids = @user.blocked_users.map(&:to_i).compact
+    return query if blocked_user_ids.empty?
+
+    # Exclude blocked users from the query
+    query.where.not(users: { id: blocked_user_ids })
   end
 
   # Ultra-optimized: Cache frequently accessed data with minimal queries
@@ -394,8 +418,8 @@ class OptimizedPoolMatchingService
   def find_user_with_gender_preference_from_array(users_array)
     return nil if users_array.empty?
 
-    # Try preferred gender first (Pool A only)
-    if @user.interested_in.present? && @user.interested_in != 'other' && @pool.name == 'Pool A'
+    # Try preferred gender first (Pool K only)
+    if @user.interested_in.present? && @user.interested_in != 'other' && @pool.name == 'Pool K'
 
       # Find the FIRST user of preferred gender in priority order
       # This respects: never-matched users first, then oldest repeats

@@ -69,13 +69,15 @@ class Api::V1::Admin::UsersController < Api::V1::Admin::BaseController
     registered = users_with_transactions.count
     inactive = users_with_transactions.where(user_status: :suspended).count
     new_users = users_with_transactions.where('users.created_at >= ?', 7.days.ago).count
+    banned = users_with_transactions.where(user_status: :suspended).count
 
     render json: {
       success: true,
       data: {
         registered: registered,
         inactive: inactive,
-        newUsers: new_users
+        newUsers: new_users,
+        banned: banned
       }
     }
   end

@@ -14,11 +14,14 @@ class User < ApplicationRecord
   has_many :video_chat_sessions, dependent: :destroy, foreign_key: :user_id
   has_many :staff_chat_sessions, dependent: :destroy, class_name: 'VideoChatSession', foreign_key: :staff_user_id
   has_many :video_waiting_rooms, dependent: :destroy
+  has_many :reports_made, class_name: 'UserReport', foreign_key: :reporter_id, dependent: :destroy
+  has_many :reports_received, class_name: 'UserReport', foreign_key: :reported_user_id, dependent: :destroy
   # Validations
   validates :email, presence: true, uniqueness: true
   validates :coin_balance, numericality: { greater_than_or_equal_to: 0 }
   validates :videos_watched_in_current_sequence, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
   validates :sequence_total_videos, numericality: { greater_than_or_equal_to: 0 }, allow_nil: true
+  validate :email_not_banned
 
   # Callbacks
   before_save :update_last_activity, if: :status_changed?
@@ -252,8 +255,70 @@ class User < ApplicationRecord
     video_waiting_rooms.present? || video_chat_sessions.where(status: :active).present? || staff_chat_sessions.where(status: :active).present?
   end
 
+  # Report functionality
+  def report_user(reported_user_id)
+    return { success: false, message: "Cannot report yourself" } if id == reported_user_id
+
+    reported_user = User.find_by(id: reported_user_id)
+    return { success: false, message: "User not found" } unless reported_user
+
+    existing_report = reports_made.find_by(reported_user_id: reported_user_id)
+    return { success: false, message: "Already reported this user" } if existing_report
+
+    reports_made.create!(reported_user_id: reported_user_id)
+    block_user(reported_user_id)
+
+    { success: true, message: "User reported successfully" }
+  rescue ActiveRecord::RecordInvalid => e
+    { success: false, message: e.message }
+  end
+
+  def block_user(user_id)
+    return false if id == user_id
+
+    blocked_users << user_id.to_s unless blocked_users.include?(user_id.to_s)
+    save!
+  end
+
+  def unblock_user(user_id)
+    blocked_users.delete(user_id.to_s)
+    save!
+  end
+
+  def blocked_user?(user_id)
+    blocked_users.include?(user_id.to_s)
+  end
+
+  def is_banned?
+    user_status == 'suspended'
+  end
+
+  def ban_user!
+    update!(user_status: :suspended)
+  end
+
+  def unban_user!
+    update!(user_status: :active)
+  end
+
   def status
     active? ? :online : :offline
+  end
+
+  # Check if email is banned (prevent banned users from creating new accounts)
+  def email_not_banned
+    return unless email.present?
+
+    # Check if this email was used by a banned user
+    banned_user = User.where(email: email, user_status: :suspended).where.not(id: id).first
+    if banned_user
+      errors.add(:email, "This email is associated with a banned account. Please contact support.")
+    end
+  end
+
+  # Class method to check if email is banned
+  def self.email_banned?(email)
+    User.where(email: email, user_status: :suspended).exists?
   end
 
   # Get watched video IDs in a specific sequence

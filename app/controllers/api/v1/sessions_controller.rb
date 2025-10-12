@@ -5,7 +5,7 @@ class Api::V1::SessionsController < ApplicationController
   def create
     user = User.find_by(email: session_params[:email])
 
-    if user && user.valid_password?(session_params[:password])
+    if user && user.valid_password?(session_params[:password]) && user.user_status != 'suspended'
       # Sign in the user with Devise JWT
       sign_in(user)
 

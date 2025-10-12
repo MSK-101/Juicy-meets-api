@@ -67,6 +67,16 @@ Rails.application.routes.draw do
         # Note: WebRTC signaling handled by PubNub on frontend
       end
 
+      # Report routes
+      resources :reports, only: [:create, :index] do
+        collection do
+          get :blocked_users
+        end
+        member do
+          delete :unblock
+        end
+      end
+
       # Algorithm management routes
       resources :pools, only: [:index, :show, :create, :update, :destroy] do
         resources :sequences, only: [:index, :show, :create, :update, :destroy] do

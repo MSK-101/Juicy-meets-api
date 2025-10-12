@@ -10,7 +10,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema[7.2].define(version: 2025_10_11_204050) do
+ActiveRecord::Schema[7.2].define(version: 2025_10_11_221905) do
   # These are extensions that must be enabled in order to support this database
   enable_extension "plpgsql"
 
@@ -169,6 +169,20 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_11_204050) do
     t.index ["user_id"], name: "index_user_ip_addresses_on_user_id"
   end
 
+  create_table "user_reports", force: :cascade do |t|
+    t.bigint "reporter_id", null: false
+    t.bigint "reported_user_id", null: false
+    t.string "reason", default: "inappropriate_behavior"
+    t.string "status", default: "pending"
+    t.text "description"
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
+    t.index ["reported_user_id"], name: "index_user_reports_on_reported_user_id"
+    t.index ["reporter_id", "reported_user_id"], name: "index_user_reports_unique_pair", unique: true
+    t.index ["reporter_id"], name: "index_user_reports_on_reporter_id"
+    t.index ["status"], name: "index_user_reports_on_status"
+  end
+
   create_table "users", force: :cascade do |t|
     t.string "email", default: "", null: false
     t.string "encrypted_password", default: "", null: false
@@ -196,11 +210,14 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_11_204050) do
     t.bigint "sequence_id"
     t.integer "videos_watched_in_current_sequence"
     t.integer "sequence_total_videos"
+    t.integer "report_count", default: 0, null: false
+    t.text "blocked_users", default: [], array: true
     t.index ["coin_balance"], name: "index_users_on_coin_balance"
     t.index ["confirmation_token"], name: "index_users_on_confirmation_token", unique: true
     t.index ["email"], name: "index_users_on_email", unique: true
     t.index ["last_activity_at"], name: "index_users_on_last_activity_at"
     t.index ["provider", "uid"], name: "index_users_on_provider_and_uid", unique: true
+    t.index ["report_count"], name: "index_users_on_report_count"
     t.index ["reset_password_token"], name: "index_users_on_reset_password_token", unique: true
     t.index ["role"], name: "index_users_on_role"
     t.index ["sequence_id"], name: "index_users_on_sequence_id"
@@ -312,6 +329,8 @@ ActiveRecord::Schema[7.2].define(version: 2025_10_11_204050) do
   add_foreign_key "staff_assignments", "sequences"
   add_foreign_key "staff_assignments", "users"
   add_foreign_key "user_ip_addresses", "users"
+  add_foreign_key "user_reports", "users", column: "reported_user_id"
+  add_foreign_key "user_reports", "users", column: "reporter_id"
   add_foreign_key "users", "sequences"
   add_foreign_key "video_chat_sessions", "pools"
   add_foreign_key "video_chat_sessions", "sequences"

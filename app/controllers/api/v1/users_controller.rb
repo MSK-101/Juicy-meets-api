@@ -3,10 +3,30 @@ class Api::V1::UsersController < ApplicationController
 
   # POST /api/v1/users
   def create
+    # Check if email is banned (prevent banned users from creating new accounts)
+    if User.email_banned?(user_params[:email])
+      render json: {
+        success: false,
+        message: "This email is associated with a banned account. Please contact support.",
+        errors: ["Email is banned"]
+      }, status: :forbidden
+      return
+    end
+
     # Check if user already exists with this email
     existing_user = User.find_by(email: user_params[:email])
     if existing_user.present?
-      # User already exists, log them in automatically
+      # Check if existing user is banned
+      if existing_user.user_status == 'suspended'
+        render json: {
+          success: false,
+          message: "This account has been suspended. Please contact support.",
+          errors: ["Account suspended"]
+        }, status: :forbidden
+        return
+      end
+
+      # User already exists and is not banned, log them in automatically
       sign_in(existing_user)
 
       # Get the JWT token from the request headers after sign_in
