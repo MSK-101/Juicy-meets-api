@@ -60,6 +60,10 @@ class AdminUsersBlueprint < Blueprinter::Base
     user.blocked_users&.length || 0
   end
 
+  field :reportCount do |user|
+    user.report_count || 0
+  end
+
   field :isBanned do |user|
     user.user_status == 'suspended'
   end
