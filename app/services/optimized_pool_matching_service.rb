@@ -56,11 +56,6 @@ class OptimizedPoolMatchingService
       return failure_result('User account suspended')
     end
 
-    # Handle ongoing video sessions
-    # if watching_video?
-    #   return handle_video_swipe
-    # end
-
     # Try matching with retries
     attempt_matching_with_retries(max_retries)
   end

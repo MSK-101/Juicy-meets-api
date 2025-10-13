@@ -1,6 +1,6 @@
 class Api::V1::VideoChatController < ApplicationController
   # Require authentication for video chat
-  before_action :authenticate_user!
+  before_action :authenticate_user!, except: [:leave]
 
   # Using PubNub for signaling - no server-side signal storage needed
   # Include coin deduction service for connection costs
@@ -8,14 +8,16 @@ class Api::V1::VideoChatController < ApplicationController
   # POST /api/video_chat/join
   # User joins the video chat queue with real-time notifications
   def join
-    user_id = current_user.id
-    current_user.go_online
+    user_id = current_user&.id || params[:user_id]
+    return unless user_id
+    user = User.find(user_id)
+    user.go_online
+    current_user = user
 
     # Clean up any old entries for this user
     VideoWaitingRoom.where(user_id: user_id).destroy_all
 
     # Get user's pool and sequence information
-    user = User.find(user_id)
     pool = user.pool
     sequence = user.role == 'staff' ? user.staff_assignment&.sequence : user.pool&.sequences&.active&.ordered&.first
     match_type = user.role == 'staff' ? 'staff' : 'real_user'
@@ -181,11 +183,12 @@ class Api::V1::VideoChatController < ApplicationController
   # POST /api/video_chat/leave
   # User leaves the video chat with instant partner notification
   def leave
-    user_id = current_user.id
+    user_id = current_user&.id || params[:user_id]
     notification_service = PubnubNotificationService.new
 
     # Find and clean up all waiting room entries for this user
-    waiting_entries = VideoWaitingRoom.where(user_id: user_id)
+    ts = Time.at(params[:ts].to_i / 1000.0)
+    waiting_entries = VideoWaitingRoom.where(user_id: user_id, created_at: ..ts)
 
     waiting_entries.each do |waiting_entry|
       if waiting_entry.room_id.present? && waiting_entry.partner_user_id.present?
@@ -204,8 +207,7 @@ class Api::V1::VideoChatController < ApplicationController
     active_sessions = VideoChatSession.where(user_id: user_id, status: 'active')
     active_sessions.update_all(
       status: 'completed',
-      ended_at: Time.current,
-      end_reason: 'user_left'
+      ended_at: Time.current
     )
 
     render json: { status: 'left' }
