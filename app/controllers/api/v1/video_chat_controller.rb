@@ -9,7 +9,6 @@ class Api::V1::VideoChatController < ApplicationController
   # User joins the video chat queue with real-time notifications
   def join
     user_id = current_user&.id || params[:user_id]
-    return unless user_id
     user = User.find(user_id)
     user.go_online
     current_user = user
@@ -57,7 +56,7 @@ class Api::V1::VideoChatController < ApplicationController
         video_name: match_result[:video_name]
       }
     else
-      render json: { status: 'joined_queue', user_id: user_id, message: match_result[:message] }
+      render json: { status: 'joined_queue', user_id: user_id, message: match_result[:message], stauts: '200' }
     end
   end
 

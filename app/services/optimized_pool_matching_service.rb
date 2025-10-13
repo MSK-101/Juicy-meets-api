@@ -827,7 +827,9 @@ class OptimizedPoolMatchingService
 
   def refresh_user_data
     @user.reload
-    @waiting_entry&.reload
+    if @waiting_entry
+      @waiting_entry = VideoWaitingRoom.find_by(id: @waiting_entry.id)
+    end
   end
 
   def staff_no_match_message
