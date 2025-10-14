@@ -5,7 +5,8 @@ class Api::V1::PurchasesController < ApplicationController
   # POST /api/v1/purchases
   def create
     # For now, use User.first as requested
-    user = User.first
+    debugger
+    user = current_user
 
     if !user
       render json: {

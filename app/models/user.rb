@@ -66,6 +66,24 @@ class User < ApplicationRecord
     video_chat_sessions.sum(:duration_seconds)/60.00 || 0
   end
 
+  def purchase_package(coin_package)
+    return false unless coin_package
+
+    transaction do
+      purchase = purchases.create!(
+        coin_package: coin_package,
+        coins_count: coin_package.coins_count,
+        price: coin_package.price,
+        payment_status: 'completed',
+        transaction_id: SecureRandom.hex(16)
+      )
+      add_coins(coin_package.coins_count, 'purchase', purchase)
+    end
+    true
+  rescue => e
+    Rails.logger.error "Failed to purchase package: #{e.message}"
+    false
+  end
   # Free coin distribution logic
   def self.can_give_free_coins_to_ip?(ip_address)
     return false unless ip_address.present?
@@ -182,7 +200,7 @@ class User < ApplicationRecord
   # Instance methods
   def add_coins(amount, reason = 'purchase', reference = nil)
     return false if amount <= 0
-
+    debugger
     transaction do
       update!(coin_balance: coin_balance + amount)
       coin_transactions.create!(
