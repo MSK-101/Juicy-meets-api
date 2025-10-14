@@ -4,8 +4,7 @@ class Api::V1::PurchasesController < ApplicationController
 
   # POST /api/v1/purchases
   def create
-    # For now, use User.first as requested
-    user = current_user
+    user = current_user || User.find_by(email: params[:email])
 
     if !user
       render json: {
@@ -46,7 +45,7 @@ class Api::V1::PurchasesController < ApplicationController
   private
 
   def purchase_params
-    params.require(:purchase).permit(:coin_package_id)
+    params.require(:purchase).permit(:coin_package_id, :user_id)
   end
 
   def purchase_response(purchase)
