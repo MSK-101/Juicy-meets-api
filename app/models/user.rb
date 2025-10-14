@@ -200,7 +200,6 @@ class User < ApplicationRecord
   # Instance methods
   def add_coins(amount, reason = 'purchase', reference = nil)
     return false if amount <= 0
-    debugger
     transaction do
       update!(coin_balance: coin_balance + amount)
       coin_transactions.create!(
