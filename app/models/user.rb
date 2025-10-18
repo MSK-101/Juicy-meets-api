@@ -92,18 +92,18 @@ class User < ApplicationRecord
 
   # Give free coins to user and track IP
   def give_free_coins_and_track_ip!(ip_address)
-    return false unless ip_address.present?
-    return false if coin_balance > 0
+    # return false unless ip_address.present?
+    # return false if coin_balance > 0
 
-    # Check if IP is eligible
-    return false unless User.can_give_free_coins_to_ip?(ip_address)
+    # # Check if IP is eligible
+    # return false unless User.can_give_free_coins_to_ip?(ip_address)
 
     # Give coins
     amount = ENV.fetch('FREE_COINS_AMOUNT', '100').to_i
     add_coins(amount, 'free_coins', nil)
 
     # Track IP
-    user_ip_addresses.create!(ip_address: ip_address)
+    # user_ip_addresses.create!(ip_address: ip_address)
 
     { success: true, coins_given: amount, message: "Free coins distributed" }
   end
