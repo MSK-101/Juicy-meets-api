@@ -714,7 +714,6 @@ class OptimizedPoolMatchingService
     # First try unwatched
     unwatched = get_unwatched_video
     return unwatched if unwatched
-
     # If all watched, rotate to avoid consecutive repeats
     all_videos = @sequence.videos.active.order(:created_at)
     return all_videos.first if all_videos.size <= 1
@@ -738,7 +737,7 @@ class OptimizedPoolMatchingService
   # Get the last match time for each video in this sequence
   def get_video_match_times
     @user.video_chat_sessions
-         .where(sequence_id: @sequence.id)
+        #  .where(sequence_id: @sequence.id)
          .where.not(video_id: nil)
          .group(:video_id)
          .maximum(:created_at)

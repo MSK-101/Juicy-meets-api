@@ -46,8 +46,8 @@ class CoinDeductionService
     applied_rules = []
 
     active_rules.each do |rule|
-      # Check if chat duration exactly matches this rule's threshold
-      if chat_duration_seconds == rule.threshold_seconds
+      # Check if chat duration is a multiple of this rule's threshold (recurring deduction)
+      if chat_duration_seconds > 0 && chat_duration_seconds % rule.threshold_seconds == 0
         # Calculate how many coins we can actually deduct
         available_coins = user.coin_balance - total_deducted
         coins_to_deduct = [available_coins, rule.coins].min

@@ -340,7 +340,7 @@ class User < ApplicationRecord
 
   # Get watched video IDs in a specific sequence
   def watched_video_ids_in_sequence(sequence_id)
-    video_chat_sessions.where(sequence_id: sequence_id).pluck(:video_id).uniq
+    video_chat_sessions.pluck(:video_id).uniq
   end
 
   # Get video with oldest chat session in a specific sequence
