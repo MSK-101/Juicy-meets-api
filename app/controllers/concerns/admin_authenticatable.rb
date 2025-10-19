@@ -31,6 +31,7 @@ module AdminAuthenticatable
       admin = Admin.find_by(email: params[:email])
       if admin
         @current_admin = admin
+        admin.update(updated_at: Time.current)
 
         # Generate new token without expiration for auto-login
         new_token = JWT.encode(

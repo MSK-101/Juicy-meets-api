@@ -164,6 +164,11 @@ class OptimizedPoolMatchingService
   end
 
   def match_by_content_type(content_type, allow_repeats)
+    # Special case: If sequence has ONLY 'app_users' (real users) as content type, use delay logic
+    if @sequence.content_type == ['app_users'] && content_type == 'app_users'
+      return find_real_user_match_with_delay
+    end
+
     case content_type
     when 'app_users'
       find_real_user_match(allow_repeats: allow_repeats)
@@ -187,6 +192,47 @@ class OptimizedPoolMatchingService
     return failure_result('No real users available') unless user_match
 
     create_user_to_user_match(user_match)
+  end
+
+  def find_real_user_match_with_delay
+    # Phase 1: Check for 5 seconds without allowing repeats
+    start_time = Time.current
+    phase_duration = 5.seconds
+    check_interval = 1.seconds
+
+    Rails.logger.info "Starting real user match with delay - Phase 1: No repeats (5s)"
+
+    while (Time.current - start_time) < phase_duration
+      base_query = build_real_user_query(false) # no repeats
+      user_match = find_user_with_gender_preference(base_query)
+
+      if user_match
+        Rails.logger.info "Found real user match in Phase 1 (no repeats)"
+        return create_user_to_user_match(user_match)
+      end
+
+      sleep(check_interval)
+    end
+
+    # Phase 2: Check for 5 seconds allowing repeats
+    Rails.logger.info "Starting Phase 2: With repeats (5s)"
+    phase_start = Time.current
+
+    while (Time.current - phase_start) < phase_duration
+      base_query = build_real_user_query(true) # allow repeats
+      puts "base_query#{@user_id}: #{base_query}"
+      user_match = find_user_with_gender_preference(base_query)
+      puts "base_query#{@user_id}: #{base_query}"
+      if user_match
+        Rails.logger.info "Found real user match in Phase 2 (with repeats)"
+        return create_user_to_user_match(user_match)
+      end
+
+      sleep(check_interval)
+    end
+
+    Rails.logger.info "No real users found after 10 seconds of checking"
+    failure_result('No real users available after 10 seconds of continuous checking')
   end
 
   def find_staff_match(allow_repeats: false)
@@ -237,7 +283,7 @@ class OptimizedPoolMatchingService
     else
       # Exclude recent partners completely
       query = base_query
-      query = query.where.not(users: { id: @recent_partners }) unless @recent_partners.empty?
+      # query = query.where.not(users: { id: @recent_partners }) unless @recent_partners.empty?
       return query.order(:joined_at)
     end
   end
@@ -279,7 +325,7 @@ class OptimizedPoolMatchingService
     query = VideoWaitingRoom.joins(:user)
                            .where(
                              pool_id: @pool.id,
-                             sequence_id: @sequence.id,
+                            #  sequence_id: @sequence.id,
                              status: 'waiting',
                              room_id: nil,
                              session_version: nil
@@ -287,7 +333,7 @@ class OptimizedPoolMatchingService
                            .where.not(user_id: @user_id)
 
     # Apply exclusions only if we have data to exclude (avoid empty array queries)
-    query = query.where.not(users: { id: @users_in_sessions }) if @users_in_sessions.any?
+    # query = query.where.not(users: { id: @users_in_sessions }) if @users_in_sessions.any?
 
     query
   end
@@ -557,6 +603,7 @@ class OptimizedPoolMatchingService
 
   def reset_waiting_entry(entry)
     entry.update!(
+      match_type: entry.user.role == 'staff' ? 'staff' : 'real_user',
       room_id: nil,
       partner_user_id: nil,
       status: 'waiting',

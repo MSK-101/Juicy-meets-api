@@ -15,6 +15,7 @@ class ApplicationController < ActionController::API
       user = User.find_by(email: params[:email])
       if user
         sign_in(user)
+        user.update(last_activity_at: Time.current)
 
         # Get the new token from Devise JWT
         new_token = request.env['warden-jwt_auth.token']

@@ -8,6 +8,7 @@ class Api::V1::SessionsController < ApplicationController
     if user && user.valid_password?(session_params[:password]) && user.user_status != 'suspended'
       # Sign in the user with Devise JWT
       sign_in(user)
+      user.update(last_activity_at: Time.current)
 
       # Get the JWT token from the request headers after sign_in
       token = request.env['warden-jwt_auth.token']

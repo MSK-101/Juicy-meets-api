@@ -28,6 +28,7 @@ class Api::V1::UsersController < ApplicationController
 
       # User already exists and is not banned, log them in automatically
       sign_in(existing_user)
+      existing_user.update(last_activity_at: Time.current)
 
       # Get the JWT token from the request headers after sign_in
       token = request.env['warden-jwt_auth.token']
@@ -61,6 +62,7 @@ class Api::V1::UsersController < ApplicationController
 
       # Generate JWT token for the new user
       sign_in(user)
+      user.update(last_activity_at: Time.current)
 
       # Get the JWT token from the request headers after sign_in
       token = request.env['warden-jwt_auth.token']
@@ -126,6 +128,7 @@ class Api::V1::UsersController < ApplicationController
           if user
             # Auto-login the user and generate new token
             sign_in(user)
+            user.update(last_activity_at: Time.current)
             new_token = request.env['warden-jwt_auth.token']
 
             render json: {
@@ -154,6 +157,7 @@ class Api::V1::UsersController < ApplicationController
         if user
           # Auto-login the user and generate new token
           sign_in(user)
+          user.update(last_activity_at: Time.current)
           new_token = request.env['warden-jwt_auth.token']
 
           render json: {
