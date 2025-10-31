@@ -10,7 +10,7 @@ gem "puma", ">= 5.0"
 # Build JSON APIs with ease [https://github.com/rails/jbuilder]
 # gem "jbuilder"
 # Real-time notifications and signaling
-gem "pubnub", "~> 5.3"
+gem "pubnub", "~> 6.0"
 
 # Use Redis adapter to run Action Cable in production (optional)
 # gem "redis", ">= 4.0.1"
